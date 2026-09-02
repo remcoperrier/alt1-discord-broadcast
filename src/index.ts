@@ -31,39 +31,19 @@ a1lib.identifyApp("./appconfig.json");
 /** The Alt1 host injects a global `alt1` object; typed loosely on purpose. */
 const alt1host = (): any => (globalThis as any).alt1;
 
-// Colours the stock chatbox palette misses — notably the teal used by
-// Leagues / seasonal broadcasts, which is where drop lines live in that mode.
-const EXTRA_COLORS: [number, number, number][] = [
-  [77, 208, 196], // teal
-  [64, 224, 208], // turquoise
-  [72, 209, 204], // medium turquoise
-  [0, 206, 209], // dark turquoise
-  [102, 255, 204], // aqua-green
-  [127, 255, 212], // aquamarine
-  [153, 255, 221],
-  [45, 213, 176],
-  [0, 255, 153],
-  [102, 255, 153],
-  [150, 255, 200],
-];
-
 const reader = new ChatBoxReader();
-reader.readargs.colors = [
-  ...defaultcolors.map((c) => a1lib.mixColor(c[0], c[1], c[2])),
-  ...EXTRA_COLORS.map((c) => a1lib.mixColor(c[0], c[1], c[2])),
-];
+reader.readargs.colors = defaultcolors.map((c) => a1lib.mixColor(c[0], c[1], c[2]));
 reader.diffReadUseTimestamps = false; // players may not have chat timestamps on
 
-// Leagues / seasonal broadcast lines carry an account badge (ironman, GIM,
-// Leagues trophy) right after the timestamp and again before the name. When the
-// game scene bleeds through a transparent chat, Alt1's pixel-exact badge match
-// fails, the reader stalls straight after "[hh:mm:ss]", and only the timestamp
-// comes through. This nudge blindly steps the cursor past whatever is stuck and
-// retries the text read.
+// Leagues / seasonal broadcast lines carry a channel glyph that isn't one of
+// the badge icons Alt1's chatbox reader knows. Its forward read stalls at that
+// glyph, so only "[hh:mm:ss]" comes through. When every built-in nudge is stuck
+// right after a "]", ":" or ")", step the cursor forward past the glyph a couple
+// of pixels at a time and retry the text read.
 interface NudgeCtx {
   imgdata: ImageData;
   font: { spacewidth: number };
-  colors: [number, number, number][];
+  colors: number[];
   rightx: number;
   baseliney: number;
   text: string;
@@ -78,15 +58,23 @@ interface NudgeCtx {
 
 reader.forwardnudges.push({
   name: "skip-stuck-glyph",
-  match: /(\]|:|\))\s?$/,
+  match: /(\]|:|\)|»|›|·)\s?$/i,
   fn: (ctx: NudgeCtx): boolean | undefined => {
     const sw = Math.max(4, Math.round(ctx.font.spacewidth || 6));
     const prev = ctx.text.replace(/\s+$/, "");
-    for (let dx = 2; dx <= sw * 9; dx += 2) {
+    for (let dx = 2; dx <= sw * 8; dx += 2) {
       const x = ctx.rightx + dx;
-      const data = OCR.readLine(ctx.imgdata, ctx.font as never, ctx.colors, x, ctx.baseliney, true, false);
+      const data = OCR.readLine(
+        ctx.imgdata,
+        ctx.font as never,
+        ctx.colors as never,
+        x,
+        ctx.baseliney,
+        true,
+        false,
+      );
       const t = (data?.text ?? "").trim();
-      // must be new text (not a re-read of what we already have)
+      // only accept genuinely new text (not a re-read of what we already have)
       if (t.length >= 2 && !prev.endsWith(t)) {
         ctx.addfrag({ color: [255, 255, 255], index: -1, text: " ", xstart: ctx.rightx, xend: x });
         for (const f of data!.fragments) ctx.addfrag(f);
@@ -142,7 +130,6 @@ el<HTMLButtonElement>("save").addEventListener("click", () => {
   };
   saveSettings(settings);
   dedup.setWindow(settings.dedupWindowMs);
-  if (settings.debugLog) wantColorSample = true;
   log("Settings saved.", "ok");
 });
 
@@ -212,42 +199,6 @@ let readFailures = 0; // consecutive null reads
 let emptyReads = 0; // consecutive reads that returned no lines at all
 let linesSeen = 0;
 let dropsMatched = 0;
-let wantColorSample = false;
-
-/** Debug aid: log the dominant saturated colours inside the chat rect, so a
- *  missing broadcast colour (e.g. Leagues teal) can be identified exactly. */
-function sampleChatColors(img: a1lib.ImgRef): void {
-  const box = (reader.pos as unknown as { mainbox?: { rect?: a1lib.RectLike } })
-    ?.mainbox?.rect;
-  if (!box) {
-    log("colour sample: no chatbox rect yet", "warn");
-    return;
-  }
-  let data: ImageData;
-  try {
-    data = img.toData(box.x, box.y, box.width, box.height);
-  } catch (e) {
-    log("colour sample failed: " + (e as Error).message, "err");
-    return;
-  }
-  const counts = new Map<string, number>();
-  const d = data.data;
-  for (let i = 0; i < d.length; i += 4) {
-    const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
-    if (a < 180) continue;
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    if (max < 100 || max - min < 25) continue; // skip background / greys
-    const key = `${(r >> 3) << 3},${(g >> 3) << 3},${(b >> 3) << 3}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  const top = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([k, n]) => `${k}×${n}`)
-    .join("   ");
-  log(`colour sample (${box.width}×${box.height}): ${top || "nothing saturated"}`);
-}
 
 function watchStatus(): void {
   if (emptyReads > 40) {
@@ -289,12 +240,6 @@ function tick(): void {
     }
     emptyReads = 0;
     log("Chatbox found.", "ok");
-    if (settings.debugLog) wantColorSample = true;
-  }
-
-  if (wantColorSample) {
-    wantColorSample = false;
-    sampleChatColors(img);
   }
 
   const lines = reader.read(img);
