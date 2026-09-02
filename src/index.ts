@@ -77,16 +77,19 @@ interface NudgeCtx {
 }
 
 reader.forwardnudges.push({
-  name: "skip-stuck-icon",
-  match: /[\]:](\s?)$/,
+  name: "skip-stuck-glyph",
+  match: /(\]|:|\))\s?$/,
   fn: (ctx: NudgeCtx): boolean | undefined => {
-    const step = Math.max(4, Math.round(ctx.font.spacewidth || 6));
-    for (let dx = step; dx <= step * 6; dx += 3) {
+    const sw = Math.max(4, Math.round(ctx.font.spacewidth || 6));
+    const prev = ctx.text.replace(/\s+$/, "");
+    for (let dx = 2; dx <= sw * 9; dx += 2) {
       const x = ctx.rightx + dx;
       const data = OCR.readLine(ctx.imgdata, ctx.font as never, ctx.colors, x, ctx.baseliney, true, false);
-      if (data && data.text && data.text.trim().length >= 2) {
+      const t = (data?.text ?? "").trim();
+      // must be new text (not a re-read of what we already have)
+      if (t.length >= 2 && !prev.endsWith(t)) {
         ctx.addfrag({ color: [255, 255, 255], index: -1, text: " ", xstart: ctx.rightx, xend: x });
-        for (const f of data.fragments) ctx.addfrag(f);
+        for (const f of data!.fragments) ctx.addfrag(f);
         return true;
       }
     }
@@ -216,30 +219,34 @@ let wantColorSample = false;
 function sampleChatColors(img: a1lib.ImgRef): void {
   const box = (reader.pos as unknown as { mainbox?: { rect?: a1lib.RectLike } })
     ?.mainbox?.rect;
-  if (!box) return;
+  if (!box) {
+    log("colour sample: no chatbox rect yet", "warn");
+    return;
+  }
   let data: ImageData;
   try {
     data = img.toData(box.x, box.y, box.width, box.height);
-  } catch {
+  } catch (e) {
+    log("colour sample failed: " + (e as Error).message, "err");
     return;
   }
   const counts = new Map<string, number>();
   const d = data.data;
   for (let i = 0; i < d.length; i += 4) {
     const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
-    if (a < 200) continue;
+    if (a < 180) continue;
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
-    if (max < 120 || max - min < 40) continue; // skip background / greys
+    if (max < 100 || max - min < 25) continue; // skip background / greys
     const key = `${(r >> 3) << 3},${(g >> 3) << 3},${(b >> 3) << 3}`;
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
   const top = [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
+    .slice(0, 8)
     .map(([k, n]) => `${k}×${n}`)
     .join("   ");
-  log("chat colours: " + top);
+  log(`colour sample (${box.width}×${box.height}): ${top || "nothing saturated"}`);
 }
 
 function watchStatus(): void {
