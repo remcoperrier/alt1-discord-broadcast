@@ -1,5 +1,6 @@
 import * as a1lib from "alt1/base";
 import * as ChatboxModule from "alt1/chatbox";
+import * as OCR from "alt1/ocr";
 
 // `alt1/chatbox` ships as a CJS/UMD bundle with a compiled `export default`.
 // Under esbuild's Node-style interop the default import resolves to the whole
@@ -53,6 +54,46 @@ reader.readargs.colors = [
 ];
 reader.diffReadUseTimestamps = false; // players may not have chat timestamps on
 
+// Leagues / seasonal broadcast lines carry an account badge (ironman, GIM,
+// Leagues trophy) right after the timestamp and again before the name. When the
+// game scene bleeds through a transparent chat, Alt1's pixel-exact badge match
+// fails, the reader stalls straight after "[hh:mm:ss]", and only the timestamp
+// comes through. This nudge blindly steps the cursor past whatever is stuck and
+// retries the text read.
+interface NudgeCtx {
+  imgdata: ImageData;
+  font: { spacewidth: number };
+  colors: [number, number, number][];
+  rightx: number;
+  baseliney: number;
+  text: string;
+  addfrag: (f: {
+    color: number[];
+    index: number;
+    text: string;
+    xstart: number;
+    xend: number;
+  }) => void;
+}
+
+reader.forwardnudges.push({
+  name: "skip-stuck-icon",
+  match: /[\]:](\s?)$/,
+  fn: (ctx: NudgeCtx): boolean | undefined => {
+    const step = Math.max(4, Math.round(ctx.font.spacewidth || 6));
+    for (let dx = step; dx <= step * 6; dx += 3) {
+      const x = ctx.rightx + dx;
+      const data = OCR.readLine(ctx.imgdata, ctx.font as never, ctx.colors, x, ctx.baseliney, true, false);
+      if (data && data.text && data.text.trim().length >= 2) {
+        ctx.addfrag({ color: [255, 255, 255], index: -1, text: " ", xstart: ctx.rightx, xend: x });
+        for (const f of data.fragments) ctx.addfrag(f);
+        return true;
+      }
+    }
+    return undefined;
+  },
+} as never);
+
 // --- Settings + UI ---------------------------------------------------------
 
 let settings: Settings = loadSettings();
@@ -98,6 +139,7 @@ el<HTMLButtonElement>("save").addEventListener("click", () => {
   };
   saveSettings(settings);
   dedup.setWindow(settings.dedupWindowMs);
+  if (settings.debugLog) wantColorSample = true;
   log("Settings saved.", "ok");
 });
 
@@ -167,6 +209,7 @@ let readFailures = 0; // consecutive null reads
 let emptyReads = 0; // consecutive reads that returned no lines at all
 let linesSeen = 0;
 let dropsMatched = 0;
+let wantColorSample = false;
 
 /** Debug aid: log the dominant saturated colours inside the chat rect, so a
  *  missing broadcast colour (e.g. Leagues teal) can be identified exactly. */
@@ -239,7 +282,12 @@ function tick(): void {
     }
     emptyReads = 0;
     log("Chatbox found.", "ok");
-    if (settings.debugLog) sampleChatColors(img);
+    if (settings.debugLog) wantColorSample = true;
+  }
+
+  if (wantColorSample) {
+    wantColorSample = false;
+    sampleChatColors(img);
   }
 
   const lines = reader.read(img);
