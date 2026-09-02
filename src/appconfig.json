@@ -1,0 +1,13 @@
+{
+  "appName": "Discord Koek",
+  "description": "Broadcasts your RuneScape 3 drops to a Discord channel.",
+  "appUrl": "./index.html",
+  "configUrl": "./appconfig.json",
+  "defaultWidth": 360,
+  "defaultHeight": 340,
+  "minWidth": 280,
+  "minHeight": 240,
+  "maxWidth": 900,
+  "maxHeight": 800,
+  "permissions": "pixel"
+}
