@@ -30,8 +30,27 @@ a1lib.identifyApp("./appconfig.json");
 /** The Alt1 host injects a global `alt1` object; typed loosely on purpose. */
 const alt1host = (): any => (globalThis as any).alt1;
 
+// Colours the stock chatbox palette misses — notably the teal used by
+// Leagues / seasonal broadcasts, which is where drop lines live in that mode.
+const EXTRA_COLORS: [number, number, number][] = [
+  [77, 208, 196], // teal
+  [64, 224, 208], // turquoise
+  [72, 209, 204], // medium turquoise
+  [0, 206, 209], // dark turquoise
+  [102, 255, 204], // aqua-green
+  [127, 255, 212], // aquamarine
+  [153, 255, 221],
+  [45, 213, 176],
+  [0, 255, 153],
+  [102, 255, 153],
+  [150, 255, 200],
+];
+
 const reader = new ChatBoxReader();
-reader.readargs.colors = defaultcolors.map((c) => a1lib.mixColor(c[0], c[1], c[2]));
+reader.readargs.colors = [
+  ...defaultcolors.map((c) => a1lib.mixColor(c[0], c[1], c[2])),
+  ...EXTRA_COLORS.map((c) => a1lib.mixColor(c[0], c[1], c[2])),
+];
 reader.diffReadUseTimestamps = false; // players may not have chat timestamps on
 
 // --- Settings + UI ---------------------------------------------------------
@@ -149,6 +168,37 @@ let emptyReads = 0; // consecutive reads that returned no lines at all
 let linesSeen = 0;
 let dropsMatched = 0;
 
+/** Debug aid: log the dominant saturated colours inside the chat rect, so a
+ *  missing broadcast colour (e.g. Leagues teal) can be identified exactly. */
+function sampleChatColors(img: a1lib.ImgRef): void {
+  const box = (reader.pos as unknown as { mainbox?: { rect?: a1lib.RectLike } })
+    ?.mainbox?.rect;
+  if (!box) return;
+  let data: ImageData;
+  try {
+    data = img.toData(box.x, box.y, box.width, box.height);
+  } catch {
+    return;
+  }
+  const counts = new Map<string, number>();
+  const d = data.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+    if (a < 200) continue;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    if (max < 120 || max - min < 40) continue; // skip background / greys
+    const key = `${(r >> 3) << 3},${(g >> 3) << 3},${(b >> 3) << 3}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const top = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6)
+    .map(([k, n]) => `${k}×${n}`)
+    .join("   ");
+  log("chat colours: " + top);
+}
+
 function watchStatus(): void {
   if (emptyReads > 40) {
     // Found the box but nothing is coming through — almost always a chat
@@ -189,6 +239,7 @@ function tick(): void {
     }
     emptyReads = 0;
     log("Chatbox found.", "ok");
+    if (settings.debugLog) sampleChatColors(img);
   }
 
   const lines = reader.read(img);
