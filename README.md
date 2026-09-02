@@ -25,9 +25,12 @@ Everything runs locally in the Alt1 app. There is no server.
 
 ```bash
 npm install
-npm run dev      # watch + dev server on http://localhost:5173
+npm run dev        # watch + dev server on http://localhost:5173
 # or
-npm run build    # one-off build into dist/
+npm run build      # one-off build into dist/
+
+npm run typecheck  # tsc --noEmit
+npm run check       # run the chat-line matcher against sample broadcasts
 ```
 
 ### Add it to Alt1 (development)

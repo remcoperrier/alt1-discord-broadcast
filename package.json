@@ -10,11 +10,11 @@
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --serve",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check": "esbuild scripts/check-matcher.mjs --bundle --platform=node --format=esm --outfile=dist/check-matcher.mjs --log-level=warning && node dist/check-matcher.mjs"
   },
   "dependencies": {
-    "@alt1/base": "1.0.0-alpha.7",
-    "@alt1/chatbox": "1.0.0-alpha.7"
+    "alt1": "^0.1.3"
   },
   "devDependencies": {
     "esbuild": "^0.24.2",

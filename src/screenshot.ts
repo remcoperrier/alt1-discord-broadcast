@@ -1,4 +1,4 @@
-import * as a1lib from "@alt1/base";
+import * as a1lib from "alt1/base";
 
 /**
  * Capture the current RuneScape client view as a PNG blob.

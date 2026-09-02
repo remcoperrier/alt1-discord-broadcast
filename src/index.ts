@@ -1,5 +1,20 @@
-import * as a1lib from "@alt1/base";
-import ChatBoxReader, { defaultcolors } from "@alt1/chatbox";
+import * as a1lib from "alt1/base";
+import * as ChatboxModule from "alt1/chatbox";
+
+// `alt1/chatbox` ships as a CJS/UMD bundle with a compiled `export default`.
+// Under esbuild's Node-style interop the default import resolves to the whole
+// `module.exports`, so the real class sits one level deeper. Resolve it here
+// with fallbacks so this works regardless of how the module is interpreted.
+type ChatBoxReaderCtor = typeof import("alt1/chatbox").default;
+const chatboxMod = ChatboxModule as unknown as {
+  default?: { default?: ChatBoxReaderCtor; defaultcolors?: number[][] } & ChatBoxReaderCtor;
+  defaultcolors?: number[][];
+};
+const ChatBoxReader: ChatBoxReaderCtor =
+  chatboxMod.default?.default ?? (chatboxMod.default as ChatBoxReaderCtor) ??
+  (ChatboxModule as unknown as ChatBoxReaderCtor);
+const defaultcolors: number[][] =
+  chatboxMod.defaultcolors ?? chatboxMod.default?.defaultcolors ?? [];
 
 import { loadSettings, saveSettings, type Settings } from "./settings";
 import { parseLine, dedupKeys } from "./matcher";
