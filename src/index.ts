@@ -102,15 +102,15 @@ el<HTMLButtonElement>("test").addEventListener("click", async () => {
 
 // --- Drop handling -------------------------------------------------------
 
-async function handleLine(text: string): Promise<void> {
+async function handleLine(text: string): Promise<boolean> {
   const ev = parseLine(text, settings.rsn);
-  if (!ev) return;
+  if (!ev) return false;
 
   if (!settings.webhook) {
     log(`Detected ${ev.qty}x ${ev.item} — but no webhook is set.`, "warn");
-    return;
+    return true;
   }
-  if (dedup.check(dedupKeys(ev, settings.rsn))) return;
+  if (dedup.check(dedupKeys(ev, settings.rsn))) return true;
 
   log(`Drop: ${ev.qty}x ${ev.item}${ev.type === "pet" ? " (pet)" : ""}`, "ok");
 
@@ -130,12 +130,29 @@ async function handleLine(text: string): Promise<void> {
   } catch (e) {
     log("Post failed: " + (e as Error).message, "err");
   }
+  return true;
 }
 
 // --- Poll loop ---------------------------------------------------------
 
 const seenThisRun = new Set<string>();
-let readFailures = 0;
+let readFailures = 0; // consecutive null reads
+let emptyReads = 0; // consecutive reads that returned no lines at all
+let linesSeen = 0;
+let dropsMatched = 0;
+
+function watchStatus(): void {
+  if (emptyReads > 40) {
+    // Found the box but nothing is coming through — almost always a chat
+    // text size the OCR fonts don't cover.
+    setStatus(
+      "Chatbox located, but no lines are being read — set RuneScape chat Text size back to the default.",
+      "warn",
+    );
+  } else {
+    setStatus(`Watching — ${linesSeen} lines seen, ${dropsMatched} drops.`, "ok");
+  }
+}
 
 function tick(): void {
   const host = alt1host();
@@ -158,30 +175,38 @@ function tick(): void {
 
   if (!reader.pos) {
     reader.pos = (reader.find(img) as unknown as typeof reader.pos) ?? null;
-    setStatus(
-      reader.pos ? "Chatbox found — watching for drops." : "Looking for your chatbox…",
-      reader.pos ? "ok" : "warn",
-    );
-    return;
+    if (!reader.pos) {
+      setStatus("Looking for your chatbox…", "warn");
+      return;
+    }
+    emptyReads = 0;
+    log("Chatbox found.", "ok");
   }
 
   const lines = reader.read(img);
   if (lines === null) {
-    if (++readFailures > 10) {
+    // Re-locate quickly; a resized / moved chat invalidates the old position.
+    if (++readFailures >= 4) {
       reader.pos = null;
       readFailures = 0;
     }
+    watchStatus();
     return;
   }
   readFailures = 0;
+  emptyReads = lines.length === 0 ? emptyReads + 1 : 0;
 
   for (const line of lines) {
     const text = line.text?.trim();
     if (!text || seenThisRun.has(text)) continue;
     seenThisRun.add(text);
     if (seenThisRun.size > 500) seenThisRun.clear();
-    void handleLine(text);
+    linesSeen++;
+    void handleLine(text).then((matched) => {
+      if (matched) dropsMatched++;
+    });
   }
+  watchStatus();
 }
 
 setInterval(tick, 600);

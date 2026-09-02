@@ -21,6 +21,10 @@ const cases = [
     null],
   ["[21:00:03] GlaZsz has received 15,000 x Onyx bolts drop!", "GlaZsz",
     { item: "Onyx bolts", qty: 15000, type: "drop" }],
+  ["[22:56:45] Leagues: ⤷taleyy has received an Orb of corrupted anima drop!", "taleyy",
+    { item: "Orb of corrupted anima", qty: 1, type: "drop" }],
+  ["[22:56:46] [Toxic Flamers] Leagues: ⤷taleyy has received a Dormant staff of Sliske drop!", "taleyy",
+    { item: "Dormant staff of Sliske", qty: 1, type: "drop" }],
 ];
 
 let failures = 0;
