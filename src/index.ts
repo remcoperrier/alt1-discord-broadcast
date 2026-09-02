@@ -34,56 +34,56 @@ const alt1host = (): any => (globalThis as any).alt1;
 const reader = new ChatBoxReader();
 reader.readargs.colors = defaultcolors.map((c) => a1lib.mixColor(c[0], c[1], c[2]));
 reader.diffReadUseTimestamps = false; // players may not have chat timestamps on
+reader.diffRead = false; // return every visible line each poll; we de-dup ourselves
 
-// Leagues / seasonal broadcast lines carry a channel glyph that isn't one of
-// the badge icons Alt1's chatbox reader knows. Its forward read stalls at that
-// glyph, so only "[hh:mm:ss]" comes through. When every built-in nudge is stuck
-// right after a "]", ":" or ")", step the cursor forward past the glyph a couple
-// of pixels at a time and retry the text read.
-interface NudgeCtx {
-  imgdata: ImageData;
-  font: { spacewidth: number };
-  colors: number[];
-  rightx: number;
-  baseliney: number;
-  text: string;
-  addfrag: (f: {
-    color: number[];
-    index: number;
-    text: string;
-    xstart: number;
-    xend: number;
-  }) => void;
+// Group / Leagues / clan broadcast lines carry channel + account glyphs that
+// aren't badge icons Alt1 knows, and its forward reader stalls at the first one
+// — often leaving just "[hh:mm:ss]". When a returned line looks stalled we
+// re-scan that physical row ourselves, stepping the cursor past any gap/glyph
+// and stitching the text runs together.
+function rescueRow(buf: ImageData, basey: number): string {
+  const font = reader.font;
+  const box = (reader.pos as unknown as { mainbox?: { rect?: a1lib.RectLike } })
+    ?.mainbox?.rect;
+  if (!font || !box) return "";
+  const localY = Math.round(basey - box.y);
+  if (localY < 1 || localY >= box.height - 1) return "";
+
+  let x = 0;
+  let out = "";
+  let misses = 0;
+  while (x < box.width && misses < 60) {
+    const run = OCR.readLine(
+      buf as never,
+      font.def as never,
+      defaultcolors as never,
+      x,
+      localY,
+      true,
+      false,
+    ) as { text?: string; fragments?: { xend?: number }[] };
+    const t = (run?.text ?? "").trim();
+    if (t.length >= 1) {
+      out += (out === "" ? "" : " ") + t;
+      const frags = run.fragments ?? [];
+      const last = frags[frags.length - 1];
+      x = (last && typeof last.xend === "number" ? last.xend : x) + 2;
+      misses = 0;
+    } else {
+      x += 2;
+      misses++;
+    }
+  }
+  return out.replace(/\s+/g, " ").trim();
 }
 
-reader.forwardnudges.push({
-  name: "skip-stuck-glyph",
-  match: /(\]|:|\)|»|›|·)\s?$/i,
-  fn: (ctx: NudgeCtx): boolean | undefined => {
-    const sw = Math.max(4, Math.round(ctx.font.spacewidth || 6));
-    const prev = ctx.text.replace(/\s+$/, "");
-    for (let dx = 2; dx <= sw * 8; dx += 2) {
-      const x = ctx.rightx + dx;
-      const data = OCR.readLine(
-        ctx.imgdata,
-        ctx.font as never,
-        ctx.colors as never,
-        x,
-        ctx.baseliney,
-        true,
-        false,
-      );
-      const t = (data?.text ?? "").trim();
-      // only accept genuinely new text (not a re-read of what we already have)
-      if (t.length >= 2 && !prev.endsWith(t)) {
-        ctx.addfrag({ color: [255, 255, 255], index: -1, text: " ", xstart: ctx.rightx, xend: x });
-        for (const f of data!.fragments) ctx.addfrag(f);
-        return true;
-      }
-    }
-    return undefined;
-  },
-} as never);
+/** A returned chat line that is really just a timestamp / channel tag, or ends
+ *  on a glyph the reader stalled at. */
+function looksStalled(t: string): boolean {
+  if (!t) return true;
+  const words = t.split(/\s+/).filter(Boolean).length;
+  return words < 4 || /[\]:)»›·⤷↝∞]\s*$/.test(t);
+}
 
 // --- Settings + UI ---------------------------------------------------------
 
@@ -255,8 +255,32 @@ function tick(): void {
   readFailures = 0;
   emptyReads = lines.length === 0 ? emptyReads + 1 : 0;
 
+  const box = (reader.pos as unknown as { mainbox?: { rect?: a1lib.RectLike } })
+    ?.mainbox?.rect;
+  let boxBuf: ImageData | null | undefined;
+  const getBoxBuf = (): ImageData | null => {
+    if (boxBuf === undefined) {
+      try {
+        boxBuf = box ? img.toData(box.x, box.y, box.width, box.height) : null;
+      } catch {
+        boxBuf = null;
+      }
+    }
+    return boxBuf;
+  };
+
   for (const line of lines) {
-    const text = line.text?.trim();
+    let text = line.text?.trim() ?? "";
+    if (looksStalled(text)) {
+      const buf = getBoxBuf();
+      if (buf) {
+        const rescued = rescueRow(buf, line.basey);
+        if (rescued.split(/\s+/).length > text.split(/\s+/).length) {
+          if (settings.debugLog && rescued) log(`rescued: ${rescued}`);
+          text = rescued;
+        }
+      }
+    }
     if (!text || seenThisRun.has(text)) continue;
     seenThisRun.add(text);
     if (seenThisRun.size > 500) seenThisRun.clear();
