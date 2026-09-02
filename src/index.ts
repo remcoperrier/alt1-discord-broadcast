@@ -45,12 +45,14 @@ const el = <T extends HTMLElement>(id: string): T =>
 const rsnEl = el<HTMLInputElement>("rsn");
 const webhookEl = el<HTMLInputElement>("webhook");
 const shotEl = el<HTMLInputElement>("shot");
+const debugEl = el<HTMLInputElement>("debug");
 const statusEl = el<HTMLDivElement>("status");
 const logEl = el<HTMLDivElement>("log");
 
 rsnEl.value = settings.rsn;
 webhookEl.value = settings.webhook;
 shotEl.checked = settings.screenshot;
+debugEl.checked = settings.debugLog;
 
 type Level = "" | "ok" | "warn" | "err";
 
@@ -59,7 +61,7 @@ function log(msg: string, level: Level = ""): void {
   if (level) row.className = level;
   row.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
   logEl.prepend(row);
-  while (logEl.childElementCount > 100) logEl.lastElementChild?.remove();
+  while (logEl.childElementCount > 250) logEl.lastElementChild?.remove();
 }
 
 function setStatus(msg: string, level: Level = ""): void {
@@ -73,6 +75,7 @@ el<HTMLButtonElement>("save").addEventListener("click", () => {
     rsn: rsnEl.value.trim(),
     webhook: webhookEl.value.trim(),
     screenshot: shotEl.checked,
+    debugLog: debugEl.checked,
   };
   saveSettings(settings);
   dedup.setWindow(settings.dedupWindowMs);
@@ -104,7 +107,12 @@ el<HTMLButtonElement>("test").addEventListener("click", async () => {
 
 async function handleLine(text: string): Promise<boolean> {
   const ev = parseLine(text, settings.rsn);
-  if (!ev) return false;
+  if (!ev) {
+    // Surface near-misses: a line that mentions "received" but didn't parse
+    // (wrong RSN spelling, OCR noise, an unexpected phrasing).
+    if (/received/i.test(text)) log(`no match: ${text}`, "warn");
+    return false;
+  }
 
   if (!settings.webhook) {
     log(`Detected ${ev.qty}x ${ev.item} — but no webhook is set.`, "warn");
@@ -202,6 +210,7 @@ function tick(): void {
     seenThisRun.add(text);
     if (seenThisRun.size > 500) seenThisRun.clear();
     linesSeen++;
+    if (settings.debugLog) log(`« ${text}`);
     void handleLine(text).then((matched) => {
       if (matched) dropsMatched++;
     });

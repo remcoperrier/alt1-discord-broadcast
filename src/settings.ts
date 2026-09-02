@@ -5,6 +5,8 @@ export interface Settings {
   webhook: string;
   /** Attach a screenshot of the RS client to each drop. */
   screenshot: boolean;
+  /** Log every OCR'd chat line to the panel (diagnostics). */
+  debugLog: boolean;
   /** How long a drop is remembered for de-duplication, in ms. */
   dedupWindowMs: number;
 }
@@ -15,6 +17,7 @@ const DEFAULTS: Settings = {
   rsn: "",
   webhook: "",
   screenshot: false,
+  debugLog: false,
   dedupWindowMs: 90_000,
 };
 
