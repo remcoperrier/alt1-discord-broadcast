@@ -5,7 +5,6 @@ export type CategoryToggle =
   | "levelups"
   | "milestones"
   | "titles"
-  | "quests"
   | "areatasks"
   | "clues";
 
@@ -38,7 +37,6 @@ const DEFAULTS: Settings = {
     levelups: true,
     milestones: true,
     titles: true,
-    quests: true,
     areatasks: true,
     clues: true,
   },
@@ -85,8 +83,6 @@ export function categoryOf(kind: EventKind): CategoryToggle {
       return "milestones";
     case "title":
       return "titles";
-    case "quest":
-      return "quests";
     case "areatask":
       return "areatasks";
     case "clue":

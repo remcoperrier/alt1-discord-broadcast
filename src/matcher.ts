@@ -10,7 +10,6 @@ export type GameEvent = { raw: string } & (
   | { kind: "skill120"; skill: string }
   | { kind: "feat"; text: string } // "... in all skills", "200 million XP ...", etc.
   | { kind: "title"; title: string; flavour: string | null }
-  | { kind: "quest"; quest: string }
   | { kind: "areatask"; area: string; tier: string | null }
   | { kind: "clue"; item: string }
 );
@@ -121,15 +120,20 @@ function matchSkillMilestone(line: string, rsn: string): GameEvent | null {
   return { kind: m[1] === "120" ? "skill120" : "skill99", skill, raw: line };
 }
 
+// Only genuine, broadcast-worthy feats — an allow-list, so routine "you have
+// completed <thing>" chatter (reaper assignments, slayer tasks, minigames)
+// never leaks through.
+const FEAT_PHRASE =
+  /\b(in all skills|million xp|completionist cape|max(?:ed)? cape|quest cape|the trimmed|for the first time|golden \S+ title|master quest)\b/i;
+
 function matchFeat(line: string, rsn: string): GameEvent | null {
   if (!hasRsn(line, rsn)) return null;
-  // broad achievement broadcasts: "... in all skills!", "200 million XP ...",
-  // "... the trimmed Completionist Cape!", first boss kills, etc.
-  const m = line.match(/has (?:just )?(?:achieved|been awarded|earned|completed) (.+?)!?$/i);
+  const m = line.match(/has (?:just )?(?:achieved|been awarded|earned|unlocked|completed) (.+?)!?$/i);
   if (!m) return null;
   const text = m[1].trim();
-  if (/^\d+ [A-Za-z]+$/.test(text)) return null; // handled by matchSkillMilestone
-  if (/\bdrop$/i.test(text)) return null; // that's a drop line
+  if (/^\d+ [A-Za-z]+$/.test(text)) return null; // -> matchSkillMilestone
+  if (/\bdrop$/i.test(text)) return null; // -> matchDrop
+  if (!FEAT_PHRASE.test(text)) return null;
   return { kind: "feat", text, raw: line };
 }
 
@@ -140,27 +144,18 @@ function matchTitle(line: string, rsn: string): GameEvent | null {
   return { kind: "title", title: m[2].trim(), flavour: m[1] ? m[1].trim() : null, raw: line };
 }
 
-function matchQuest(line: string): GameEvent | null {
-  // personal: "Congratulations! You have completed <Quest>."
-  const m = line.match(
-    /you have completed (?:the quest[:.]?\s*)?(?:['"]?)(.+?)(?:['"]?)[.!]?$/i,
-  );
-  if (!m) return null;
-  const quest = m[1].trim();
-  if (/achievement|task|treasure trail|challenge|reclaiming/i.test(quest)) return null;
-  if (quest.split(/\s+/).length > 8) return null; // sentence, not a quest name
-  return { kind: "quest", quest, raw: line };
-}
-
 function matchAreaTask(line: string): GameEvent | null {
-  // personal / friends: "... completed all[ of the] [Easy] Desert achievements/tasks ..."
+  // "... completed all[ of the] [Easy] Desert achievements ..."
+  // Requires the literal word "achievements" — "tasks"/"assignments" are noisy.
   const m = line.match(
-    /completed all(?: of)?(?: the)? (easy|medium|hard|elite|master)?\s*([A-Za-z' ]+?) (?:area )?(?:achievements|tasks)\b/i,
+    /completed all(?: of)?(?: the)? (easy|medium|hard|elite|master)?\s*([A-Za-z' ]{2,40}?) achievements\b/i,
   );
   if (!m) return null;
+  const area = m[2].trim();
+  if (area.split(/\s+/).length > 4) return null;
   return {
     kind: "areatask",
-    area: m[2].trim(),
+    area,
     tier: m[1] ? m[1].trim().toLowerCase() : null,
     raw: line,
   };
@@ -189,7 +184,6 @@ export function parseLine(rawText: string, rsn: string): GameEvent | null {
     matchTitle(line, rsn) ||
     matchClue(line, rsn) ||
     matchAreaTask(line) ||
-    matchQuest(line) ||
     matchFeat(line, rsn) ||
     null
   );
@@ -197,7 +191,7 @@ export function parseLine(rawText: string, rsn: string): GameEvent | null {
 
 /** A line that looks like it *should* have matched — for the "no match" debug log. */
 export function looksInteresting(rawText: string): boolean {
-  return /\b(has received|advanced a|advanced your|you've achieved|has achieved|has unlocked|completed a treasure trail|completed all)\b/i.test(
+  return /\b(has received|advanced a|advanced your|you've achieved|has achieved|has unlocked|completed a treasure trail|completed all of the .+ achievements)\b/i.test(
     normalize(rawText),
   );
 }
@@ -226,9 +220,6 @@ export function dedupKeys(ev: GameEvent, rsn: string): string[] {
       break;
     case "title":
       sem = `title|${ev.title.toLowerCase()}`;
-      break;
-    case "quest":
-      sem = `quest|${ev.quest.toLowerCase()}`;
       break;
     case "areatask":
       sem = `areatask|${ev.area.toLowerCase()}|${ev.tier ?? ""}`;

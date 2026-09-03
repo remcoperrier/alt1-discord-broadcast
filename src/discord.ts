@@ -16,7 +16,6 @@ const COLOR: Record<GameEvent["kind"], number> = {
   skill120: 0xf59e0b, // amber
   feat: 0xa78bfa, // purple
   title: 0xa78bfa, // purple
-  quest: 0x2dd4bf, // teal
   areatask: 0xfb923c, // orange
   clue: 0xfde047, // yellow
 };
@@ -34,7 +33,6 @@ function titleFor(ev: GameEvent): string {
     case "skill120": return "Skill Mastered";
     case "feat": return "Achievement";
     case "title": return "Title Unlocked";
-    case "quest": return "Quest Complete";
     case "areatask": return "Area Tasks";
     case "clue": return "Treasure Trail";
   }
@@ -85,10 +83,6 @@ function bodyFor(ev: GameEvent, ctx: PostContext): { description: string; fields
         description:
           `${who} has unlocked the ${ev.flavour ? ev.flavour + " " : ""}` +
           `**'${ev.title}'** title!`,
-      };
-    case "quest":
-      return {
-        description: `${who} has completed the quest [**${ev.quest}**](${wikiUrl(ev.quest)})!`,
       };
     case "areatask": {
       const label = `${ev.tier ? cap(ev.tier) + " " : ""}${displayItem(ev.area)} achievements`;

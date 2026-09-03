@@ -91,6 +91,53 @@ function looksStalled(t: string): boolean {
   return words < 4 || /[\]:)»›·⤷↝∞]\s*$/.test(t);
 }
 
+// --- RSN auto-detection ----------------------------------------------------
+
+/** Read the player's name from the chat input line
+ *  ("<name>[, the <title>]: [Public Chat - Press Enter to Chat]"). The name is
+ *  always white; titles and icons are other colours, so a white-only OCR pass
+ *  isolates it. */
+function detectRsnFromChat(img: a1lib.ImgRef): string | null {
+  const font = reader.font as unknown as { def: unknown; lineheight?: number } | null;
+  const box = (reader.pos as unknown as { mainbox?: { rect?: a1lib.RectLike } })
+    ?.mainbox?.rect;
+  if (!font || !box) return null;
+
+  const lh = Math.max(10, Math.round(font.lineheight ?? 14));
+  let buf: ImageData;
+  try {
+    buf = img.toData(box.x, box.y, box.width, box.height + lh * 2);
+  } catch {
+    try {
+      buf = img.toData(box.x, box.y, box.width, box.height);
+    } catch {
+      return null;
+    }
+  }
+
+  const white = [[255, 255, 255]] as never;
+  for (let y = buf.height - 3; y >= box.height - lh * 3 && y > 2; y -= 2) {
+    const full = OCR.readLine(buf as never, font.def as never, defaultcolors as never, 0, y, true, false) as { text?: string };
+    if (!/enter to chat/i.test(full?.text ?? "")) continue;
+    const wht = OCR.readLine(buf as never, font.def as never, white, 0, y, true, false) as { text?: string };
+    const name = cleanName(wht?.text ?? "", full?.text ?? "");
+    if (name) return name;
+  }
+  return null;
+}
+
+function cleanName(whiteText: string, fullText: string): string | null {
+  let n = whiteText.replace(/\s+/g, " ").trim().split("[")[0].replace(/[\s,:]+$/, "").trim();
+  n = n.replace(/^[^A-Za-z0-9]+/, "").trim();
+  if (!n) {
+    n = fullText.split("[")[0].replace(/[\s,:]+$/, "").replace(/^[^A-Za-z0-9]+/, "").trim();
+    if (n.split(/\s+/).length > 2) return null; // can't split name from title in a colour blob
+  }
+  if (n.length < 1 || n.length > 12) return null;
+  if (/\b(chat|press|enter|public|clan|group|private|friends|guest|the)\b/i.test(n)) return null;
+  return n;
+}
+
 // --- Settings + UI ---------------------------------------------------------
 
 let settings: Settings = loadSettings();
@@ -108,7 +155,7 @@ const statusEl = el<HTMLDivElement>("status");
 const logEl = el<HTMLDivElement>("log");
 
 const CATEGORIES: CategoryToggle[] = [
-  "drops", "levelups", "milestones", "titles", "quests", "areatasks", "clues",
+  "drops", "levelups", "milestones", "titles", "areatasks", "clues",
 ];
 const catEls = Object.fromEntries(
   CATEGORIES.map((c) => [c, el<HTMLInputElement>(`c-${c}`)]),
@@ -184,8 +231,7 @@ function describe(ev: GameEvent): string {
     case "skill120": return `120 ${ev.skill}`;
     case "feat": return ev.text;
     case "title": return `title '${ev.title}'`;
-    case "quest": return `quest ${ev.quest}`;
-    case "areatask": return `${ev.tier ?? ""} ${ev.area} tasks`.trim();
+    case "areatask": return `${ev.tier ?? ""} ${ev.area} achievements`.trim();
     case "clue": return `clue: ${ev.item}`;
   }
 }
@@ -230,6 +276,24 @@ let readFailures = 0; // consecutive null reads
 let emptyReads = 0; // consecutive reads that returned no lines at all
 let linesSeen = 0;
 let dropsMatched = 0;
+let rsnDetectCooldown = 0; // poll ticks until the next auto-detect attempt
+
+function maybeDetectRsn(img: a1lib.ImgRef): void {
+  if (settings.rsn) return;
+  if (rsnDetectCooldown-- > 0) return;
+  rsnDetectCooldown = 25; // ~15s between attempts
+  let name: string | null = null;
+  try {
+    name = detectRsnFromChat(img);
+  } catch {
+    name = null;
+  }
+  if (!name) return;
+  settings = { ...settings, rsn: name };
+  saveSettings(settings);
+  rsnEl.value = name;
+  log(`Auto-detected RuneScape name: ${name}`, "ok");
+}
 
 function watchStatus(): void {
   if (emptyReads > 40) {
@@ -285,6 +349,8 @@ function tick(): void {
   }
   readFailures = 0;
   emptyReads = lines.length === 0 ? emptyReads + 1 : 0;
+
+  maybeDetectRsn(img);
 
   const box = (reader.pos as unknown as { mainbox?: { rect?: a1lib.RectLike } })
     ?.mainbox?.rect;

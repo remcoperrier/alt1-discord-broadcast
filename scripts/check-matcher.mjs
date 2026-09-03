@@ -52,6 +52,16 @@ const cases = [
   ["[21:00:00] *News: taleyy completed a Treasure Trail and received Third age longsword!", "taleyy",
     { kind: "clue", item: "Third age longsword" }],
 
+  // area task (heuristic)
+  ["[21:00:00] You have completed all of the Easy Desert achievements!", "taleyy",
+    { kind: "areatask", area: "Desert", tier: "easy" }],
+
+  // must NOT match — routine "completed" chatter
+  ["[21:05:48] You have completed 882 assignments.", "taleyy", null],
+  ["[21:05:48] You have completed Death's assignment, gaining 41,250 Slayer XP, 22 slayer points and 26 reaper points.", "taleyy", null],
+  ["[21:05:48] Completion Time: 01:11.4", "taleyy", null],
+  ["[20:39:00] taleyy has completed a Slayer challenge!", "taleyy", null],
+
   // not our RSN and no personal marker
   ["[23:04:36] Leagues: ⤷GIMCappy has achieved 99 Cooking!", "taleyy", null],
 ];
