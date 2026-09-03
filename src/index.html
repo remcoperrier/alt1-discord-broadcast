@@ -29,6 +29,28 @@
       input:focus { outline: 1px solid #5b5bf0; border-color: #5b5bf0; }
       .row { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
       .row label { margin: 0; }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 3px 10px;
+        margin-top: 4px;
+      }
+      .chk {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        margin: 0;
+        color: #d7d7db;
+        font-size: 12px;
+      }
+      input[type="number"] {
+        padding: 4px 6px;
+        background: #26262b;
+        border: 1px solid #3a3a42;
+        border-radius: 4px;
+        color: #eee;
+        font: inherit;
+      }
       .btns { display: flex; gap: 8px; margin-top: 12px; }
       button {
         padding: 6px 12px;
@@ -78,9 +100,25 @@
       <label for="webhook">Discord webhook URL</label>
       <input id="webhook" type="url" placeholder="https://discord.com/api/webhooks/..." autocomplete="off" spellcheck="false" />
 
+      <label>Broadcast</label>
+      <div class="grid">
+        <label class="chk"><input id="c-drops" type="checkbox" /> Drops &amp; pets</label>
+        <label class="chk"><input id="c-levelups" type="checkbox" /> Level-ups</label>
+        <label class="chk"><input id="c-milestones" type="checkbox" /> 99 / 120 / XP</label>
+        <label class="chk"><input id="c-titles" type="checkbox" /> Titles</label>
+        <label class="chk"><input id="c-quests" type="checkbox" /> Quests</label>
+        <label class="chk"><input id="c-areatasks" type="checkbox" /> Area tasks</label>
+        <label class="chk"><input id="c-clues" type="checkbox" /> Clue caskets</label>
+      </div>
+
+      <div class="row">
+        <label for="lvlmin" style="margin:0">Level-ups only from level</label>
+        <input id="lvlmin" type="number" min="2" max="120" style="width:64px" />
+      </div>
+
       <div class="row">
         <input id="shot" type="checkbox" />
-        <label for="shot">Attach a screenshot to each drop</label>
+        <label for="shot">Attach a screenshot to drop / clue posts</label>
       </div>
 
       <div class="row">

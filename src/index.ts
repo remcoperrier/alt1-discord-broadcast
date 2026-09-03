@@ -17,11 +17,17 @@ const ChatBoxReader: ChatBoxReaderCtor =
 const defaultcolors: number[][] =
   chatboxMod.defaultcolors ?? chatboxMod.default?.defaultcolors ?? [];
 
-import { loadSettings, saveSettings, type Settings } from "./settings";
-import { parseLine, dedupKeys } from "./matcher";
+import {
+  loadSettings,
+  saveSettings,
+  categoryOf,
+  type Settings,
+  type CategoryToggle,
+} from "./settings";
+import { parseLine, dedupKeys, looksInteresting, type GameEvent } from "./matcher";
 import { Dedup } from "./dedup";
 import { getPrice } from "./prices";
-import { postDrop } from "./discord";
+import { postEvent } from "./discord";
 import { captureScreenshot } from "./screenshot";
 
 // --- Alt1 wiring -------------------------------------------------------------
@@ -97,13 +103,23 @@ const rsnEl = el<HTMLInputElement>("rsn");
 const webhookEl = el<HTMLInputElement>("webhook");
 const shotEl = el<HTMLInputElement>("shot");
 const debugEl = el<HTMLInputElement>("debug");
+const lvlMinEl = el<HTMLInputElement>("lvlmin");
 const statusEl = el<HTMLDivElement>("status");
 const logEl = el<HTMLDivElement>("log");
+
+const CATEGORIES: CategoryToggle[] = [
+  "drops", "levelups", "milestones", "titles", "quests", "areatasks", "clues",
+];
+const catEls = Object.fromEntries(
+  CATEGORIES.map((c) => [c, el<HTMLInputElement>(`c-${c}`)]),
+) as Record<CategoryToggle, HTMLInputElement>;
 
 rsnEl.value = settings.rsn;
 webhookEl.value = settings.webhook;
 shotEl.checked = settings.screenshot;
 debugEl.checked = settings.debugLog;
+lvlMinEl.value = String(settings.levelUpMin);
+for (const c of CATEGORIES) catEls[c].checked = settings.categories[c];
 
 type Level = "" | "ok" | "warn" | "err";
 
@@ -121,13 +137,19 @@ function setStatus(msg: string, level: Level = ""): void {
 }
 
 el<HTMLButtonElement>("save").addEventListener("click", () => {
+  const lvlMin = Math.min(120, Math.max(2, parseInt(lvlMinEl.value, 10) || 99));
   settings = {
     ...settings,
     rsn: rsnEl.value.trim(),
     webhook: webhookEl.value.trim(),
     screenshot: shotEl.checked,
     debugLog: debugEl.checked,
+    levelUpMin: lvlMin,
+    categories: Object.fromEntries(
+      CATEGORIES.map((c) => [c, catEls[c].checked]),
+    ) as Settings["categories"],
   };
+  lvlMinEl.value = String(lvlMin);
   saveSettings(settings);
   dedup.setWindow(settings.dedupWindowMs);
   log("Settings saved.", "ok");
@@ -140,51 +162,60 @@ el<HTMLButtonElement>("test").addEventListener("click", async () => {
   }
   try {
     const shot = settings.screenshot ? await captureScreenshot() : null;
-    const res = await postDrop(settings.webhook, {
-      rsn: settings.rsn || "Test User",
-      item: "Zaryte vambraces",
-      qty: 1,
-      type: "drop",
-      value: await getPrice("Zaryte vambraces"),
-      screenshot: shot,
-    });
+    const res = await postEvent(
+      settings.webhook,
+      { kind: "drop", item: "Zaryte vambraces", qty: 1, pet: false, raw: "test" },
+      { rsn: settings.rsn || "Test User", value: await getPrice("Zaryte vambraces"), screenshot: shot },
+    );
     log(res.ok ? "Test message sent." : `Test failed: HTTP ${res.status}`, res.ok ? "ok" : "err");
   } catch (e) {
     log("Test error: " + (e as Error).message, "err");
   }
 });
 
-// --- Drop handling -------------------------------------------------------
+// --- Event handling ----------------------------------------------------
+
+function describe(ev: GameEvent): string {
+  switch (ev.kind) {
+    case "drop": return `${ev.qty}x ${ev.item}${ev.pet ? " (pet)" : ""}`;
+    case "levelup": return `${ev.virtual ? "virtual " : ""}level ${ev.level} ${ev.skill}`;
+    case "xp": return `${ev.xp.toLocaleString()} XP ${ev.skill}`;
+    case "skill99": return `99 ${ev.skill}`;
+    case "skill120": return `120 ${ev.skill}`;
+    case "feat": return ev.text;
+    case "title": return `title '${ev.title}'`;
+    case "quest": return `quest ${ev.quest}`;
+    case "areatask": return `${ev.tier ?? ""} ${ev.area} tasks`.trim();
+    case "clue": return `clue: ${ev.item}`;
+  }
+}
 
 async function handleLine(text: string): Promise<boolean> {
   const ev = parseLine(text, settings.rsn);
   if (!ev) {
-    // Surface near-misses: a line that mentions "received" but didn't parse
-    // (wrong RSN spelling, OCR noise, an unexpected phrasing).
-    if (/received/i.test(text)) log(`no match: ${text}`, "warn");
+    if (looksInteresting(text)) log(`no match: ${text}`, "warn");
     return false;
   }
 
+  // category gate
+  if (!settings.categories[categoryOf(ev.kind)]) return true;
+  // level-up threshold (virtual level-ups always pass)
+  if (ev.kind === "levelup" && !ev.virtual && ev.level < settings.levelUpMin) return true;
+
   if (!settings.webhook) {
-    log(`Detected ${ev.qty}x ${ev.item} — but no webhook is set.`, "warn");
+    log(`Detected ${describe(ev)} — but no webhook is set.`, "warn");
     return true;
   }
   if (dedup.check(dedupKeys(ev, settings.rsn))) return true;
 
-  log(`Drop: ${ev.qty}x ${ev.item}${ev.type === "pet" ? " (pet)" : ""}`, "ok");
+  log(`${ev.kind}: ${describe(ev)}`, "ok");
 
-  const value = await getPrice(ev.item);
-  const shot = settings.screenshot ? await captureScreenshot() : null;
+  const wantsItem = ev.kind === "drop" || ev.kind === "clue";
+  const value = wantsItem ? await getPrice((ev as { item: string }).item) : null;
+  const shot = wantsItem && settings.screenshot ? await captureScreenshot() : null;
 
   try {
-    const res = await postDrop(settings.webhook, {
-      rsn: settings.rsn,
-      item: ev.item,
-      qty: ev.qty,
-      type: ev.type,
-      value,
-      screenshot: shot,
-    });
+    const res = await postEvent(settings.webhook, ev, { rsn: settings.rsn, value, screenshot: shot });
     log(res.ok ? "Posted to Discord." : `Discord error: HTTP ${res.status}`, res.ok ? "ok" : "err");
   } catch (e) {
     log("Post failed: " + (e as Error).message, "err");
