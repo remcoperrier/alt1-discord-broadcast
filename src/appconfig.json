@@ -1,13 +1,13 @@
 {
-  "appName": "Discord Koek",
+  "appName": "Hungry Terrorbirds - Drops",
   "description": "Broadcasts your RuneScape 3 drops, level-ups and achievements to a Discord channel.",
   "appUrl": "./index.html",
   "configUrl": "https://remcoperrier.github.io/alt1-discord-broadcast/appconfig.json",
-  "defaultWidth": 360,
-  "defaultHeight": 480,
-  "minWidth": 280,
-  "minHeight": 240,
-  "maxWidth": 900,
-  "maxHeight": 800,
+  "defaultWidth": 344,
+  "defaultHeight": 430,
+  "minWidth": 300,
+  "minHeight": 340,
+  "maxWidth": 640,
+  "maxHeight": 700,
   "permissions": "pixel"
 }

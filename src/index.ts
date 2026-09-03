@@ -148,11 +148,17 @@ const el = <T extends HTMLElement>(id: string): T =>
 
 const rsnEl = el<HTMLInputElement>("rsn");
 const webhookEl = el<HTMLInputElement>("webhook");
+const whInputRow = el<HTMLDivElement>("wh-input-row");
+const whSavedRow = el<HTMLDivElement>("wh-saved-row");
+const whTailEl = el<HTMLElement>("wh-tail");
 const shotEl = el<HTMLInputElement>("shot");
-const debugEl = el<HTMLInputElement>("debug");
 const lvlMinEl = el<HTMLInputElement>("lvlmin");
 const statusEl = el<HTMLDivElement>("status");
-const logEl = el<HTMLDivElement>("log");
+const statusTextEl = el<HTMLSpanElement>("status-text");
+const lastEl = el<HTMLDivElement>("last");
+
+const DEBUG =
+  new URLSearchParams(location.search).has("debug") || !!settings.debugLog;
 
 const CATEGORIES: CategoryToggle[] = [
   "drops", "levelups", "milestones", "titles", "areatasks", "clues",
@@ -162,35 +168,65 @@ const catEls = Object.fromEntries(
 ) as Record<CategoryToggle, HTMLInputElement>;
 
 rsnEl.value = settings.rsn;
-webhookEl.value = settings.webhook;
 shotEl.checked = settings.screenshot;
-debugEl.checked = settings.debugLog;
 lvlMinEl.value = String(settings.levelUpMin);
 for (const c of CATEGORIES) catEls[c].checked = settings.categories[c];
 
 type Level = "" | "ok" | "warn" | "err";
 
-function log(msg: string, level: Level = ""): void {
-  const row = document.createElement("div");
-  if (level) row.className = level;
-  row.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-  logEl.prepend(row);
-  while (logEl.childElementCount > 250) logEl.lastElementChild?.remove();
+/** Debug-only console line (visible with ?debug or a stored debugLog flag). */
+function dlog(msg: string): void {
+  if (DEBUG) console.log("[koek] " + msg);
 }
 
 function setStatus(msg: string, level: Level = ""): void {
-  statusEl.textContent = msg;
-  statusEl.className = level;
+  statusTextEl.textContent = msg;
+  statusEl.className = "status" + (level ? " " + level : "");
 }
+
+function setLast(ev: GameEvent): void {
+  lastEl.innerHTML =
+    "Last broadcast: <b></b> · " +
+    new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  lastEl.querySelector("b")!.textContent = describe(ev);
+  lastEl.classList.remove("hidden");
+}
+
+// --- webhook show / hide ------------------------------------------------
+
+let editingWebhook = false;
+
+function renderWebhook(): void {
+  const saved = settings.webhook;
+  if (saved && !editingWebhook) {
+    whTailEl.textContent = saved.slice(-6);
+    whSavedRow.classList.remove("hidden");
+    whInputRow.classList.add("hidden");
+  } else {
+    webhookEl.value = editingWebhook ? saved : webhookEl.value;
+    whInputRow.classList.remove("hidden");
+    whSavedRow.classList.add("hidden");
+  }
+}
+
+el<HTMLButtonElement>("wh-change").addEventListener("click", () => {
+  editingWebhook = true;
+  renderWebhook();
+  webhookEl.focus();
+});
+
+renderWebhook();
 
 el<HTMLButtonElement>("save").addEventListener("click", () => {
   const lvlMin = Math.min(120, Math.max(2, parseInt(lvlMinEl.value, 10) || 99));
+  const webhook = whInputRow.classList.contains("hidden")
+    ? settings.webhook
+    : webhookEl.value.trim();
   settings = {
     ...settings,
     rsn: rsnEl.value.trim(),
-    webhook: webhookEl.value.trim(),
+    webhook,
     screenshot: shotEl.checked,
-    debugLog: debugEl.checked,
     levelUpMin: lvlMin,
     categories: Object.fromEntries(
       CATEGORIES.map((c) => [c, catEls[c].checked]),
@@ -199,25 +235,10 @@ el<HTMLButtonElement>("save").addEventListener("click", () => {
   lvlMinEl.value = String(lvlMin);
   saveSettings(settings);
   dedup.setWindow(settings.dedupWindowMs);
-  log("Settings saved.", "ok");
-});
-
-el<HTMLButtonElement>("test").addEventListener("click", async () => {
-  if (!settings.webhook) {
-    log("Set a webhook URL first.", "err");
-    return;
-  }
-  try {
-    const shot = settings.screenshot ? await captureScreenshot() : null;
-    const res = await postEvent(
-      settings.webhook,
-      { kind: "drop", item: "Zaryte vambraces", qty: 1, pet: false, raw: "test" },
-      { rsn: settings.rsn || "Test User", value: await getPrice("Zaryte vambraces"), screenshot: shot },
-    );
-    log(res.ok ? "Test message sent." : `Test failed: HTTP ${res.status}`, res.ok ? "ok" : "err");
-  } catch (e) {
-    log("Test error: " + (e as Error).message, "err");
-  }
+  editingWebhook = false;
+  webhookEl.value = "";
+  renderWebhook();
+  setStatus("Settings saved.", "ok");
 });
 
 // --- Event handling ----------------------------------------------------
@@ -236,25 +257,22 @@ function describe(ev: GameEvent): string {
   }
 }
 
-async function handleLine(text: string): Promise<boolean> {
+async function handleLine(text: string): Promise<void> {
   const ev = parseLine(text, settings.rsn);
   if (!ev) {
-    if (looksInteresting(text)) log(`no match: ${text}`, "warn");
-    return false;
+    if (DEBUG && looksInteresting(text)) dlog(`no match: ${text}`);
+    return;
   }
 
-  // category gate
-  if (!settings.categories[categoryOf(ev.kind)]) return true;
-  // level-up threshold (virtual level-ups always pass)
-  if (ev.kind === "levelup" && !ev.virtual && ev.level < settings.levelUpMin) return true;
-
+  if (!settings.categories[categoryOf(ev.kind)]) return;
+  if (ev.kind === "levelup" && !ev.virtual && ev.level < settings.levelUpMin) return;
   if (!settings.webhook) {
-    log(`Detected ${describe(ev)} — but no webhook is set.`, "warn");
-    return true;
+    dlog(`matched ${describe(ev)} but no webhook set`);
+    return;
   }
-  if (dedup.check(dedupKeys(ev, settings.rsn))) return true;
+  if (dedup.check(dedupKeys(ev, settings.rsn))) return;
 
-  log(`${ev.kind}: ${describe(ev)}`, "ok");
+  dlog(`${ev.kind}: ${describe(ev)}`);
 
   const wantsItem = ev.kind === "drop" || ev.kind === "clue";
   const value = wantsItem ? await getPrice((ev as { item: string }).item) : null;
@@ -262,11 +280,16 @@ async function handleLine(text: string): Promise<boolean> {
 
   try {
     const res = await postEvent(settings.webhook, ev, { rsn: settings.rsn, value, screenshot: shot });
-    log(res.ok ? "Posted to Discord." : `Discord error: HTTP ${res.status}`, res.ok ? "ok" : "err");
+    if (res.ok) {
+      setLast(ev);
+    } else {
+      setStatus(`Discord rejected the post (HTTP ${res.status}).`, "err");
+      dlog(`discord HTTP ${res.status}`);
+    }
   } catch (e) {
-    log("Post failed: " + (e as Error).message, "err");
+    setStatus("Couldn't reach Discord.", "err");
+    dlog("post failed: " + (e as Error).message);
   }
-  return true;
 }
 
 // --- Poll loop ---------------------------------------------------------
@@ -274,8 +297,6 @@ async function handleLine(text: string): Promise<boolean> {
 const seenThisRun = new Set<string>();
 let readFailures = 0; // consecutive null reads
 let emptyReads = 0; // consecutive reads that returned no lines at all
-let linesSeen = 0;
-let dropsMatched = 0;
 let rsnDetectCooldown = 0; // poll ticks until the next auto-detect attempt
 
 function maybeDetectRsn(img: a1lib.ImgRef): void {
@@ -292,19 +313,21 @@ function maybeDetectRsn(img: a1lib.ImgRef): void {
   settings = { ...settings, rsn: name };
   saveSettings(settings);
   rsnEl.value = name;
-  log(`Auto-detected RuneScape name: ${name}`, "ok");
+  dlog(`auto-detected RSN: ${name}`);
 }
 
 function watchStatus(): void {
   if (emptyReads > 40) {
-    // Found the box but nothing is coming through — almost always a chat
-    // text size the OCR fonts don't cover.
     setStatus(
-      "Chatbox located, but no lines are being read — set RuneScape chat Text size back to the default.",
+      "Chat box found, but lines aren't readable — use the default chat text size.",
       "warn",
     );
+  } else if (!settings.webhook) {
+    setStatus("Add your Discord webhook to start broadcasting.", "warn");
+  } else if (!settings.rsn) {
+    setStatus("Watching — detecting your name…", "ok");
   } else {
-    setStatus(`Watching — ${linesSeen} lines seen, ${dropsMatched} drops.`, "ok");
+    setStatus("Watching your chat box.", "ok");
   }
 }
 
@@ -334,7 +357,7 @@ function tick(): void {
       return;
     }
     emptyReads = 0;
-    log("Chatbox found.", "ok");
+    dlog("chat box located");
   }
 
   const lines = reader.read(img);
@@ -373,7 +396,7 @@ function tick(): void {
       if (buf) {
         const rescued = rescueRow(buf, line.basey);
         if (rescued.split(/\s+/).length > text.split(/\s+/).length) {
-          if (settings.debugLog && rescued) log(`rescued: ${rescued}`);
+          if (rescued) dlog(`rescued: ${rescued}`);
           text = rescued;
         }
       }
@@ -381,14 +404,11 @@ function tick(): void {
     if (!text || seenThisRun.has(text)) continue;
     seenThisRun.add(text);
     if (seenThisRun.size > 500) seenThisRun.clear();
-    linesSeen++;
-    if (settings.debugLog) log(`« ${text}`);
-    void handleLine(text).then((matched) => {
-      if (matched) dropsMatched++;
-    });
+    dlog(`« ${text}`);
+    void handleLine(text);
   }
   watchStatus();
 }
 
 setInterval(tick, 600);
-log("Discord Koek started.");
+dlog("started");

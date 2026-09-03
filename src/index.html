@@ -3,135 +3,239 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Discord Koek</title>
+    <title>Hungry Terrorbirds - Drops</title>
     <style>
-      :root { color-scheme: dark; }
+      :root {
+        --bg: #1b160e;
+        --panel: #2b2417;
+        --panel-2: #221c11;
+        --edge: #0c0a06;
+        --frame: #6f5a34;
+        --frame-lite: #9a7f4a;
+        --gold: #ffb43b;
+        --gold-lite: #ffd27a;
+        --text: #e9dcbe;
+        --muted: #9c8a63;
+        --field: #14100a;
+        --danger: #d6503f;
+        --ok: #7fc96b;
+      }
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        font: 13px/1.45 system-ui, "Segoe UI", sans-serif;
-        background: #1b1b1f;
-        color: #d7d7db;
+        background: var(--bg);
+        color: var(--text);
+        font: 13px/1.45 "Trebuchet MS", "Segoe UI", sans-serif;
       }
-      .wrap { padding: 10px 12px 14px; }
-      h1 { font-size: 14px; margin: 0 0 4px; }
-      .sub { color: #83838c; font-size: 11px; margin-bottom: 8px; }
-      label { display: block; margin: 9px 0 2px; color: #9a9aa2; font-size: 12px; }
-      input[type="text"], input[type="url"] {
+      .frame {
+        min-height: 100vh;
+        background:
+          radial-gradient(130% 90% at 50% -20%, rgba(255, 180, 59, 0.07), transparent 60%),
+          linear-gradient(180deg, var(--panel), var(--panel-2));
+        border: 1px solid var(--frame);
+        box-shadow: inset 0 0 0 1px var(--edge), inset 0 0 28px rgba(0, 0, 0, 0.55);
+      }
+      h1 {
+        margin: 0;
+        padding: 8px 12px 7px;
+        font-size: 15px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        color: var(--gold);
+        text-shadow: 0 1px 0 #000, 0 0 12px rgba(255, 180, 59, 0.25);
+        background: linear-gradient(180deg, #3a3019, #2a2214);
+        border-bottom: 1px solid var(--frame);
+      }
+      h1 .sub { color: var(--muted); font-weight: 400; }
+      .body { padding: 11px 12px 14px; }
+
+      .lbl {
+        display: block;
+        margin: 12px 0 3px;
+        color: var(--gold);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+      }
+      .lbl:first-child { margin-top: 0; }
+      .divider {
+        height: 1px;
+        margin: 13px 0 2px;
+        background: linear-gradient(90deg, transparent, var(--frame-lite), transparent);
+      }
+
+      .inp {
         width: 100%;
         padding: 5px 7px;
-        background: #26262b;
-        border: 1px solid #3a3a42;
-        border-radius: 4px;
-        color: #eee;
+        background: var(--field);
+        color: var(--text);
+        border: 1px solid var(--frame);
+        border-radius: 2px;
         font: inherit;
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6);
       }
-      input:focus { outline: 1px solid #5b5bf0; border-color: #5b5bf0; }
-      .row { display: flex; align-items: center; gap: 6px; margin-top: 10px; }
-      .row label { margin: 0; }
+      .inp:focus {
+        outline: none;
+        border-color: var(--gold);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 180, 59, 0.4);
+      }
+      .inp--num { width: 58px; text-align: center; }
+      .inp--static {
+        display: flex;
+        align-items: center;
+        flex: 1;
+        color: var(--muted);
+        letter-spacing: 2px;
+        overflow: hidden;
+      }
+      .inp--static b { color: var(--text); letter-spacing: 0; margin-left: 4px; }
+
+      .row { display: flex; align-items: center; gap: 8px; }
+      .row--split { justify-content: space-between; margin-top: 12px; }
+
+      .btn {
+        font: inherit;
+        cursor: pointer;
+        padding: 5px 12px;
+        border: 1px solid var(--frame);
+        border-radius: 2px;
+        background: linear-gradient(180deg, #3b3119, #2a2113);
+        color: var(--gold);
+        text-shadow: 0 1px 0 #000;
+      }
+      .btn:hover { border-color: var(--gold); color: var(--gold-lite); }
+      .btn:active { transform: translateY(1px); }
+      .btn--gold {
+        width: 100%;
+        margin-top: 14px;
+        padding: 8px;
+        font-weight: 700;
+        letter-spacing: 0.5px;
+        background: linear-gradient(180deg, #5a4a24, #3a2f16);
+      }
+      .btn--ghost { padding: 4px 10px; font-size: 12px; }
+
       .grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 3px 10px;
-        margin-top: 4px;
+        gap: 3px 14px;
+        margin-top: 5px;
       }
       .chk {
         display: flex;
         align-items: center;
-        gap: 5px;
-        margin: 0;
-        color: #d7d7db;
-        font-size: 12px;
-      }
-      input[type="number"] {
-        padding: 4px 6px;
-        background: #26262b;
-        border: 1px solid #3a3a42;
-        border-radius: 4px;
-        color: #eee;
-        font: inherit;
-      }
-      .btns { display: flex; gap: 8px; margin-top: 12px; }
-      button {
-        padding: 6px 12px;
-        border: 0;
-        border-radius: 4px;
-        color: #fff;
-        font: inherit;
+        gap: 7px;
+        margin: 3px 0;
         cursor: pointer;
-        background: #3b3bd6;
-      }
-      button.secondary { background: #34343c; }
-      button:hover { filter: brightness(1.1); }
-      #status {
-        margin-top: 12px;
-        padding: 6px 9px;
-        border-radius: 4px;
-        background: #26262b;
+        color: var(--text);
         font-size: 12px;
       }
-      #status.ok { background: #14351f; color: #7ee2a8; }
-      #status.warn { background: #3a3216; color: #f5cf7a; }
-      #status.err { background: #3a1a1a; color: #f2a3a3; }
-      #log {
-        margin-top: 9px;
-        height: 132px;
-        overflow: auto;
-        background: #141417;
-        border: 1px solid #2c2c33;
-        border-radius: 4px;
-        padding: 6px 8px;
-        font: 11px/1.5 ui-monospace, "Cascadia Code", monospace;
-        white-space: pre-wrap;
+      .chk input { position: absolute; opacity: 0; width: 0; height: 0; }
+      .chk i {
+        width: 13px;
+        height: 13px;
+        flex: 0 0 13px;
+        border: 1px solid var(--frame);
+        border-radius: 2px;
+        background: var(--field);
+        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.5);
+        position: relative;
       }
-      #log .ok { color: #6fe0a0; }
-      #log .warn { color: #f0cd83; }
-      #log .err { color: #f09b9b; }
+      .chk input:checked + i {
+        background: linear-gradient(180deg, var(--gold-lite), var(--gold));
+        border-color: var(--gold-lite);
+      }
+      .chk input:checked + i::after {
+        content: "";
+        position: absolute;
+        left: 4px;
+        top: 0;
+        width: 3px;
+        height: 7px;
+        border: solid #2a1c05;
+        border-width: 0 2px 2px 0;
+        transform: rotate(40deg);
+      }
+      .chk input:focus-visible + i { box-shadow: 0 0 0 2px rgba(255, 180, 59, 0.55); }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 13px;
+        padding: 6px 9px;
+        font-size: 12px;
+        color: var(--muted);
+        background: var(--panel-2);
+        border: 1px solid var(--frame);
+        border-radius: 2px;
+      }
+      .status .dot {
+        width: 8px;
+        height: 8px;
+        flex: 0 0 8px;
+        border-radius: 50%;
+        background: currentColor;
+        box-shadow: 0 0 7px currentColor;
+      }
+      .status.ok { color: var(--ok); }
+      .status.warn { color: var(--gold-lite); }
+      .status.err { color: var(--danger); }
+
+      .last {
+        margin-top: 6px;
+        padding: 0 2px;
+        font-size: 11px;
+        color: var(--muted);
+      }
+      .last b { color: var(--gold-lite); font-weight: 400; }
+
+      .hidden { display: none !important; }
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <h1>Discord Koek</h1>
-      <div class="sub">Posts your RS3 drops to a Discord channel.</div>
+    <div class="frame">
+      <h1>Hungry Terrorbirds <span class="sub">&mdash; Drops</span></h1>
+      <div class="body">
+        <label class="lbl" for="rsn">RuneScape name</label>
+        <input id="rsn" class="inp" type="text" placeholder="auto-detected from your chat box…"
+               autocomplete="off" spellcheck="false" />
 
-      <label for="rsn">Your RuneScape name <span style="color:#83838c">(auto-detected — leave blank)</span></label>
-      <input id="rsn" type="text" placeholder="detected from your chat box…" autocomplete="off" spellcheck="false" />
+        <label class="lbl" for="webhook">Discord webhook</label>
+        <div id="wh-input-row" class="row">
+          <input id="webhook" class="inp" type="password" placeholder="paste webhook URL, then Save"
+                 autocomplete="off" spellcheck="false" />
+        </div>
+        <div id="wh-saved-row" class="row hidden">
+          <span class="inp inp--static">•••••••••••••••<b id="wh-tail"></b></span>
+          <button id="wh-change" class="btn btn--ghost" type="button">Change</button>
+        </div>
 
-      <label for="webhook">Discord webhook URL</label>
-      <input id="webhook" type="url" placeholder="https://discord.com/api/webhooks/..." autocomplete="off" spellcheck="false" />
+        <div class="divider"></div>
+        <label class="lbl">Broadcast</label>
+        <div class="grid">
+          <label class="chk"><input type="checkbox" id="c-drops" /><i></i>Drops &amp; pets</label>
+          <label class="chk"><input type="checkbox" id="c-levelups" /><i></i>Level-ups</label>
+          <label class="chk"><input type="checkbox" id="c-milestones" /><i></i>99 / 120 / XP</label>
+          <label class="chk"><input type="checkbox" id="c-titles" /><i></i>Titles</label>
+          <label class="chk"><input type="checkbox" id="c-areatasks" /><i></i>Area tasks</label>
+          <label class="chk"><input type="checkbox" id="c-clues" /><i></i>Clue caskets</label>
+        </div>
 
-      <label>Broadcast</label>
-      <div class="grid">
-        <label class="chk"><input id="c-drops" type="checkbox" /> Drops &amp; pets</label>
-        <label class="chk"><input id="c-levelups" type="checkbox" /> Level-ups</label>
-        <label class="chk"><input id="c-milestones" type="checkbox" /> 99 / 120 / XP</label>
-        <label class="chk"><input id="c-titles" type="checkbox" /> Titles</label>
-        <label class="chk"><input id="c-areatasks" type="checkbox" /> Area tasks</label>
-        <label class="chk"><input id="c-clues" type="checkbox" /> Clue caskets</label>
+        <div class="row row--split">
+          <span class="lbl" style="margin: 0">Level-ups from level</span>
+          <input id="lvlmin" class="inp inp--num" type="number" min="2" max="120" />
+        </div>
+
+        <div style="margin-top: 10px">
+          <label class="chk"><input type="checkbox" id="shot" /><i></i>Attach a screenshot to drops &amp; clues</label>
+        </div>
+
+        <button id="save" class="btn btn--gold" type="button">Save</button>
+
+        <div id="status" class="status"><span class="dot"></span><span id="status-text">Starting…</span></div>
+        <div id="last" class="last hidden"></div>
       </div>
-
-      <div class="row">
-        <label for="lvlmin" style="margin:0">Level-ups only from level</label>
-        <input id="lvlmin" type="number" min="2" max="120" style="width:64px" />
-      </div>
-
-      <div class="row">
-        <input id="shot" type="checkbox" />
-        <label for="shot">Attach a screenshot to drop / clue posts</label>
-      </div>
-
-      <div class="row">
-        <input id="debug" type="checkbox" />
-        <label for="debug">Log every chat line (debug)</label>
-      </div>
-
-      <div class="btns">
-        <button id="save">Save</button>
-        <button id="test" class="secondary">Send test</button>
-      </div>
-
-      <div id="status">Starting&hellip;</div>
-      <div id="log"></div>
     </div>
     <script type="module" src="./bundle.js"></script>
   </body>
