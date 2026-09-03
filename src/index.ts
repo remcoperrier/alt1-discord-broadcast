@@ -26,7 +26,7 @@ import {
 } from "./settings";
 import { parseLine, dedupKeys, looksInteresting, type GameEvent } from "./matcher";
 import { Dedup } from "./dedup";
-import { getPrice } from "./prices";
+import { getItem } from "./prices";
 import { postEvent } from "./discord";
 import { captureScreenshot } from "./screenshot";
 
@@ -241,6 +241,31 @@ el<HTMLButtonElement>("save").addEventListener("click", () => {
   setStatus("Settings saved.", "ok");
 });
 
+el<HTMLButtonElement>("preview").addEventListener("click", async () => {
+  if (!settings.webhook) {
+    setStatus("Add a webhook first, then Save.", "warn");
+    return;
+  }
+  const sample: GameEvent = {
+    kind: "drop",
+    item: "Zaryte vambraces",
+    qty: 1,
+    pet: false,
+    raw: "preview",
+  };
+  try {
+    const info = await getItem(sample.item);
+    const res = await postEvent(settings.webhook, sample, {
+      rsn: settings.rsn || "Preview",
+      value: info.price,
+      itemId: info.id,
+    });
+    setStatus(res.ok ? "Test drop sent." : `Test failed (HTTP ${res.status}).`, res.ok ? "ok" : "err");
+  } catch {
+    setStatus("Test failed — couldn't reach Discord.", "err");
+  }
+});
+
 // --- Event handling ----------------------------------------------------
 
 function describe(ev: GameEvent): string {
@@ -275,11 +300,16 @@ async function handleLine(text: string): Promise<void> {
   dlog(`${ev.kind}: ${describe(ev)}`);
 
   const wantsItem = ev.kind === "drop" || ev.kind === "clue";
-  const value = wantsItem ? await getPrice((ev as { item: string }).item) : null;
+  const info = wantsItem ? await getItem((ev as { item: string }).item) : null;
   const shot = wantsItem && settings.screenshot ? await captureScreenshot() : null;
 
   try {
-    const res = await postEvent(settings.webhook, ev, { rsn: settings.rsn, value, screenshot: shot });
+    const res = await postEvent(settings.webhook, ev, {
+      rsn: settings.rsn,
+      value: info?.price ?? null,
+      itemId: info?.id ?? null,
+      screenshot: shot,
+    });
     if (res.ok) {
       setLast(ev);
     } else {

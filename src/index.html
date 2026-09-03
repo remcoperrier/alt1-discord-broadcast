@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Hungry Terrorbirds - Drops</title>
+    <link rel="icon" href="./icon.png" />
+    <title>HT - Drops</title>
     <style>
       :root {
         --bg: #1b160e;
@@ -37,7 +38,7 @@
       }
       h1 {
         margin: 0;
-        padding: 8px 12px 7px;
+        padding: 7px 12px 6px;
         font-size: 15px;
         font-weight: 700;
         letter-spacing: 0.3px;
@@ -45,6 +46,15 @@
         text-shadow: 0 1px 0 #000, 0 0 12px rgba(255, 180, 59, 0.25);
         background: linear-gradient(180deg, #3a3019, #2a2214);
         border-bottom: 1px solid var(--frame);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      h1 .hdr-icon {
+        width: 22px;
+        height: 22px;
+        object-fit: contain;
+        filter: drop-shadow(0 1px 1px #000);
       }
       h1 .sub { color: var(--muted); font-weight: 400; }
       .body { padding: 11px 12px 14px; }
@@ -181,6 +191,25 @@
       .status.ok { color: var(--ok); }
       .status.warn { color: var(--gold-lite); }
       .status.err { color: var(--danger); }
+      .status.ok .dot { animation: pulse 2s ease-in-out infinite; }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; box-shadow: 0 0 7px currentColor; }
+        50% { opacity: 0.45; box-shadow: 0 0 2px currentColor; }
+      }
+
+      .adv { margin-top: 8px; }
+      .adv > summary {
+        cursor: pointer;
+        list-style: none;
+        color: var(--gold);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        padding: 4px 0;
+      }
+      .adv > summary::-webkit-details-marker { display: none; }
+      .adv > summary::before { content: "▸ "; color: var(--muted); }
+      .adv[open] > summary::before { content: "▾ "; }
 
       .last {
         margin-top: 6px;
@@ -195,7 +224,10 @@
   </head>
   <body>
     <div class="frame">
-      <h1>Hungry Terrorbirds <span class="sub">&mdash; Drops</span></h1>
+      <h1>
+        <img class="hdr-icon" src="./icon.png" alt="" onerror="this.remove()" />
+        HT <span class="sub">&mdash; Drops</span>
+      </h1>
       <div class="body">
         <label class="lbl" for="rsn">RuneScape name</label>
         <input id="rsn" class="inp" type="text" placeholder="auto-detected from your chat box…"
@@ -214,24 +246,29 @@
         <div class="divider"></div>
         <label class="lbl">Broadcast</label>
         <div class="grid">
-          <label class="chk"><input type="checkbox" id="c-drops" /><i></i>Drops &amp; pets</label>
-          <label class="chk"><input type="checkbox" id="c-levelups" /><i></i>Level-ups</label>
-          <label class="chk"><input type="checkbox" id="c-milestones" /><i></i>99 / 120 / XP</label>
-          <label class="chk"><input type="checkbox" id="c-titles" /><i></i>Titles</label>
-          <label class="chk"><input type="checkbox" id="c-areatasks" /><i></i>Area tasks</label>
-          <label class="chk"><input type="checkbox" id="c-clues" /><i></i>Clue caskets</label>
+          <label class="chk" title="Item and pet drops that mention your name, e.g. “… has received a Zamorak hilt drop!”"><input type="checkbox" id="c-drops" /><i></i>Drops &amp; pets</label>
+          <label class="chk" title="Every skill level you gain (see the threshold under Advanced)"><input type="checkbox" id="c-levelups" /><i></i>Level-ups</label>
+          <label class="chk" title="Reaching 99 or 120 in a skill, and XP milestones like 200M"><input type="checkbox" id="c-milestones" /><i></i>99 / 120 / XP</label>
+          <label class="chk" title="“… has unlocked the '…' title!” broadcasts"><input type="checkbox" id="c-titles" /><i></i>Titles</label>
+          <label class="chk" title="Completing an area's achievement set (e.g. all Easy Desert achievements)"><input type="checkbox" id="c-areatasks" /><i></i>Area tasks</label>
+          <label class="chk" title="“… completed a Treasure Trail and received …” casket rewards"><input type="checkbox" id="c-clues" /><i></i>Clue caskets</label>
         </div>
 
-        <div class="row row--split">
-          <span class="lbl" style="margin: 0">Level-ups from level</span>
-          <input id="lvlmin" class="inp inp--num" type="number" min="2" max="120" />
-        </div>
+        <details class="adv">
+          <summary>Advanced</summary>
+          <div class="row row--split">
+            <span class="lbl" style="margin: 0">Level-ups from level</span>
+            <input id="lvlmin" class="inp inp--num" type="number" min="2" max="120" />
+          </div>
+          <div style="margin-top: 10px">
+            <label class="chk"><input type="checkbox" id="shot" /><i></i>Attach a screenshot to drops &amp; clues</label>
+          </div>
+        </details>
 
-        <div style="margin-top: 10px">
-          <label class="chk"><input type="checkbox" id="shot" /><i></i>Attach a screenshot to drops &amp; clues</label>
+        <div class="row" style="margin-top: 14px; gap: 8px">
+          <button id="save" class="btn btn--gold" type="button" style="flex: 1; margin-top: 0">Save</button>
+          <button id="preview" class="btn btn--ghost" type="button" title="Send a sample drop to your webhook">Test</button>
         </div>
-
-        <button id="save" class="btn btn--gold" type="button">Save</button>
 
         <div id="status" class="status"><span class="dot"></span><span id="status-text">Starting…</span></div>
         <div id="last" class="last hidden"></div>

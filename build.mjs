@@ -2,7 +2,7 @@
 //   node build.mjs           -> one-off build into dist/
 //   node build.mjs --serve   -> watch + local dev server on :5173
 import * as esbuild from "esbuild";
-import { cp, mkdir, rm, writeFile } from "node:fs/promises";
+import { access, cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 
 const OUT = "dist";
 const serve = process.argv.includes("--serve");
@@ -10,14 +10,23 @@ const serve = process.argv.includes("--serve");
 await rm(OUT, { recursive: true, force: true });
 await mkdir(OUT, { recursive: true });
 
-/** Copy the static shell (html + appconfig) into dist after every rebuild. */
+const exists = (p) => access(p).then(() => true, () => false);
+
+/** Copy the static shell into dist after every rebuild, cache-busting the
+ *  bundle reference so Alt1 / browsers never serve a stale build. */
 const staticFiles = {
   name: "static-files",
   setup(build) {
     build.onEnd(async () => {
-      await cp("src/index.html", `${OUT}/index.html`);
+      const v = Date.now().toString(36);
+      const html = (await readFile("src/index.html", "utf8")).replace(
+        './bundle.js"',
+        `./bundle.js?v=${v}"`,
+      );
+      await writeFile(`${OUT}/index.html`, html);
       await cp("src/appconfig.json", `${OUT}/appconfig.json`);
       await writeFile(`${OUT}/.nojekyll`, ""); // GitHub Pages: serve files as-is
+      if (await exists("src/icon.png")) await cp("src/icon.png", `${OUT}/icon.png`);
     });
   },
 };

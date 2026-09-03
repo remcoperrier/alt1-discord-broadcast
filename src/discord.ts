@@ -1,10 +1,17 @@
 import type { GameEvent } from "./matcher";
 import { displayItem, fmtShort, wikiUrl } from "./format";
+import { itemIconUrl } from "./prices";
+
+/** Hosted terrorbird icon — used as the embed author/footer icon. */
+const BRAND_ICON =
+  "https://remcoperrier.github.io/alt1-discord-broadcast/icon.png";
 
 export interface PostContext {
   rsn: string;
   /** GE value per item for drops / clue rewards, or null. */
   value?: number | null;
+  /** GE item id for drops / clue rewards, for the thumbnail, or null. */
+  itemId?: number | null;
   screenshot?: Blob | null;
 }
 
@@ -107,13 +114,17 @@ function cap(s: string): string {
 export function buildEmbed(ev: GameEvent, ctx: PostContext): Record<string, unknown> {
   const { description, fields } = bodyFor(ev, ctx);
   const embed: Record<string, unknown> = {
-    author: { name: ctx.rsn || "Unknown" },
+    author: { name: ctx.rsn || "Unknown", icon_url: BRAND_ICON },
     title: titleFor(ev),
     color: COLOR[ev.kind],
     description,
+    footer: { text: "HT - Drops" },
     timestamp: new Date().toISOString(),
   };
   if (fields) embed.fields = fields;
+  if ((ev.kind === "drop" || ev.kind === "clue") && ctx.itemId != null) {
+    embed.thumbnail = { url: itemIconUrl(ctx.itemId) };
+  }
   if (ctx.screenshot) embed.image = { url: "attachment://drop.png" };
   return embed;
 }
@@ -124,7 +135,10 @@ export async function postEvent(
   ev: GameEvent,
   ctx: PostContext,
 ): Promise<Response> {
-  const payload = { embeds: [buildEmbed(ev, ctx)] };
+  const payload = {
+    embeds: [buildEmbed(ev, ctx)],
+    allowed_mentions: { parse: [] as string[] },
+  };
 
   if (ctx.screenshot) {
     const form = new FormData();

@@ -1,8 +1,9 @@
 {
-  "appName": "Hungry Terrorbirds - Drops",
+  "appName": "HT - Drops",
   "description": "Broadcasts your RuneScape 3 drops, level-ups and achievements to a Discord channel.",
   "appUrl": "./index.html",
   "configUrl": "https://remcoperrier.github.io/alt1-discord-broadcast/appconfig.json",
+  "iconUrl": "https://remcoperrier.github.io/alt1-discord-broadcast/icon.png",
   "defaultWidth": 344,
   "defaultHeight": 430,
   "minWidth": 300,
