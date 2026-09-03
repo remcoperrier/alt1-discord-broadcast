@@ -2,7 +2,7 @@
 //   node build.mjs           -> one-off build into dist/
 //   node build.mjs --serve   -> watch + local dev server on :5173
 import * as esbuild from "esbuild";
-import { cp, mkdir, rm } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 
 const OUT = "dist";
 const serve = process.argv.includes("--serve");
@@ -17,6 +17,7 @@ const staticFiles = {
     build.onEnd(async () => {
       await cp("src/index.html", `${OUT}/index.html`);
       await cp("src/appconfig.json", `${OUT}/appconfig.json`);
+      await writeFile(`${OUT}/.nojekyll`, ""); // GitHub Pages: serve files as-is
     });
   },
 };

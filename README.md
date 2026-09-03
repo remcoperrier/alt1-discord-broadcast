@@ -1,76 +1,81 @@
 # Discord Koek
 
-An [Alt1 Toolkit](https://runeapps.org/alt1) plugin that watches your RuneScape 3
-chatbox and posts **your** drops to a Discord channel.
+An [Alt1 Toolkit](https://runeapps.org/alt1) app that watches your RuneScape 3
+chatbox and posts **your own** drops, level-ups and achievements to a Discord
+channel — like RuneLite's Dink, for RS3.
 
-## How it works
+## Install (for friends — no build needed)
 
-```
-Alt1 chatbox reader  ->  matcher ("<your RSN> ... has received ...")
-      ->  de-dup (90s window)  ->  GE price (Weird Gloop API)
-      ->  screenshot (optional)  ->  Discord webhook
-```
+1. Install [Alt1 Toolkit](https://runeapps.org/alt1).
+2. Add the app — click this link, or paste the URL into Alt1 → **Add App**:
 
-Everything runs locally in the Alt1 app. There is no server.
+   ```
+   alt1://addapp/https://remcoperrier.github.io/alt1-discord-broadcast/appconfig.json
+   ```
 
-## Prerequisites
+3. Grant the **pixel** permission when Alt1 asks.
+4. In the app: enter **Your RuneScape name** (exactly as in game), paste a
+   **Discord webhook URL** (Channel → Edit → Integrations → Webhooks → New
+   Webhook → Copy URL), pick which categories to broadcast, **Save**, then
+   **Send test**.
 
-- [Node.js](https://nodejs.org) 18+ (for building only)
-- [Alt1 Toolkit](https://runeapps.org/alt1) installed
-- RuneScape 3 running via the official client / NXT
-- A Discord **webhook URL** for the target channel
-  (Channel → Edit → Integrations → Webhooks → New Webhook → Copy URL)
+Everything runs locally in the Alt1 app — no server, and your webhook never
+leaves your machine.
 
-## Build / run
+## What it broadcasts
+
+| Category | Example source line |
+|---|---|
+| Drops & pets | `<RSN> has received a Zamorak hilt drop!` |
+| Level-ups | `You've just advanced a Defence level! You have reached level 104.` |
+| 99 / 120 / XP | `<RSN> has achieved 99 Cooking!` · `Well done! You've achieved 20,000,000 XP in Defence!` |
+| Titles | `<RSN> has unlocked the 'Jack of All Blades' title!` |
+| Quests | `You have completed <Quest>.` |
+| Area tasks | `…completed all of the Easy Desert achievements` |
+| Clue caskets | `<RSN> completed a Treasure Trail and received <item>!` |
+
+Drops link the item to the RS Wiki and show GE value (Weird Gloop API);
+level-ups link the skill; quests / area tasks link their wiki page.
+
+## Chat setup
+
+- Keep a chat tab where your broadcasts appear (game / clan / broadcast on).
+- Use the **default chat text size** (Alt1's OCR fonts only cover that).
+- Chat timestamps are optional — de-dup does not rely on them.
+
+## Development
+
+Requires [Node.js](https://nodejs.org) 18+.
 
 ```bash
 npm install
 npm run dev        # watch + dev server on http://localhost:5173
-# or
 npm run build      # one-off build into dist/
-
 npm run typecheck  # tsc --noEmit
-npm run check       # run the chat-line matcher against sample broadcasts
+npm run check      # run the matcher against sample chat lines
 ```
 
-### Add it to Alt1 (development)
-
-With `npm run dev` running, open this URL (Alt1 registers the `alt1://` scheme):
+Add the dev build to Alt1:
 
 ```
 alt1://addapp/http://localhost:5173/appconfig.json
 ```
 
-or in Alt1: **Add App → Manual → `http://localhost:5173/appconfig.json`**.
+## Deployment
 
-## In-game setup
+Pushing to `main` triggers `.github/workflows/deploy.yml`, which builds and
+publishes `dist/` to GitHub Pages at
+`https://remcoperrier.github.io/alt1-discord-broadcast/`. Alt1 re-checks
+`configUrl` on reload, so a push reaches every friend.
 
-- Keep a chat tab where your drop broadcasts appear (game/clan/broadcast messages on).
-- Chat timestamps are **not required** — de-dup does not depend on them.
-- Grant the app the **pixel** permission when Alt1 asks.
+One-time repo setup: **Settings → Pages → Source: GitHub Actions**.
 
-## Plugin setup
-
-1. Open the app in Alt1.
-2. Enter **Your RuneScape name** exactly as it appears in game.
-3. Paste your **Discord webhook URL**.
-4. Optionally tick **Attach a screenshot**.
-5. **Save**, then **Send test** to confirm the webhook works.
-
-## Distribution (later)
-
-Build and publish `dist/` to GitHub Pages, then friends add:
+## Architecture
 
 ```
-alt1://addapp/https://<you>.github.io/<repo>/appconfig.json
+Alt1 chatbox reader ─► row-rescue OCR for stalled lines
+  ─► matcher (drop | levelup | xp | 99/120 | feat | title | quest | areatask | clue)
+  ─► category gate + de-dup (90s, per-kind semantic key)
+  ─► GE price (drops/clues) + screenshot (optional)
+  ─► per-kind embed ─► Discord webhook
 ```
-
-Each friend enters their own RSN and (their own or a shared) webhook URL.
-
-## Scope of v1
-
-- Trigger: any chat line containing your RSN **and** `has received`.
-- Embed: player name, item (linked to the RS Wiki), quantity, GE value, optional
-  screenshot, timestamp.
-- Not in v1: boss name / drop rarity, Google Sheet logging, level-ups / quests /
-  achievements. All planned as additions to the same pipeline.

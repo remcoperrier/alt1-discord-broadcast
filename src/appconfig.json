@@ -1,10 +1,10 @@
 {
   "appName": "Discord Koek",
-  "description": "Broadcasts your RuneScape 3 drops to a Discord channel.",
+  "description": "Broadcasts your RuneScape 3 drops, level-ups and achievements to a Discord channel.",
   "appUrl": "./index.html",
-  "configUrl": "./appconfig.json",
+  "configUrl": "https://remcoperrier.github.io/alt1-discord-broadcast/appconfig.json",
   "defaultWidth": 360,
-  "defaultHeight": 340,
+  "defaultHeight": 480,
   "minWidth": 280,
   "minHeight": 240,
   "maxWidth": 900,
