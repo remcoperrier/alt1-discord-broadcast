@@ -13,6 +13,8 @@ export interface Settings {
   rsn: string;
   /** Discord webhook URL to POST events to. */
   webhook: string;
+  /** Discord user id (snowflake) to @mention on every broadcast; "" = no ping. */
+  pingUserId: string;
   /** Attach a screenshot of the RS client to drop / clue posts. */
   screenshot: boolean;
   /** Log every OCR'd chat line to the panel (diagnostics). */
@@ -30,6 +32,7 @@ const KEY = "discord-koek:settings";
 const DEFAULTS: Settings = {
   rsn: "",
   webhook: "",
+  pingUserId: "",
   screenshot: false,
   debugLog: false,
   categories: {

@@ -12,6 +12,8 @@ export interface PostContext {
   value?: number | null;
   /** GE item id for drops / clue rewards, for the thumbnail, or null. */
   itemId?: number | null;
+  /** Discord user id (snowflake) to @mention on this post, or null. */
+  pingUserId?: string | null;
   screenshot?: Blob | null;
 }
 
@@ -135,10 +137,15 @@ export async function postEvent(
   ev: GameEvent,
   ctx: PostContext,
 ): Promise<Response> {
-  const payload = {
+  const ping = ctx.pingUserId && /^\d{17,20}$/.test(ctx.pingUserId)
+    ? ctx.pingUserId
+    : null;
+  const payload: Record<string, unknown> = {
     embeds: [buildEmbed(ev, ctx)],
-    allowed_mentions: { parse: [] as string[] },
+    // Whitelist only the ping target — a name/title in the embed still can't ping.
+    allowed_mentions: ping ? { users: [ping] } : { parse: [] as string[] },
   };
+  if (ping) payload.content = `<@${ping}>`;
 
   if (ctx.screenshot) {
     const form = new FormData();

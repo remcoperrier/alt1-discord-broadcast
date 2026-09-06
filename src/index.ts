@@ -161,6 +161,7 @@ const webhookEl = el<HTMLInputElement>("webhook");
 const whInputRow = el<HTMLDivElement>("wh-input-row");
 const whSavedRow = el<HTMLDivElement>("wh-saved-row");
 const whTailEl = el<HTMLElement>("wh-tail");
+const pingEl = el<HTMLInputElement>("ping");
 const shotEl = el<HTMLInputElement>("shot");
 const lvlMinEl = el<HTMLInputElement>("lvlmin");
 const statusEl = el<HTMLDivElement>("status");
@@ -178,6 +179,7 @@ const catEls = Object.fromEntries(
 ) as Record<CategoryToggle, HTMLInputElement>;
 
 rsnEl.value = settings.rsn;
+pingEl.value = settings.pingUserId;
 shotEl.checked = settings.screenshot;
 lvlMinEl.value = String(settings.levelUpMin);
 for (const c of CATEGORIES) catEls[c].checked = settings.categories[c];
@@ -232,16 +234,19 @@ el<HTMLButtonElement>("save").addEventListener("click", () => {
   const webhook = whInputRow.classList.contains("hidden")
     ? settings.webhook
     : webhookEl.value.trim();
+  const pingUserId = pingEl.value.replace(/\D/g, "");
   settings = {
     ...settings,
     rsn: rsnEl.value.trim(),
     webhook,
+    pingUserId,
     screenshot: shotEl.checked,
     levelUpMin: lvlMin,
     categories: Object.fromEntries(
       CATEGORIES.map((c) => [c, catEls[c].checked]),
     ) as Settings["categories"],
   };
+  pingEl.value = pingUserId;
   lvlMinEl.value = String(lvlMin);
   saveSettings(settings);
   dedup.setWindow(settings.dedupWindowMs);
@@ -269,6 +274,7 @@ el<HTMLButtonElement>("preview").addEventListener("click", async () => {
       rsn: settings.rsn || "Preview",
       value: info.price,
       itemId: info.id,
+      pingUserId: settings.pingUserId || null,
     });
     setStatus(res.ok ? "Test drop sent." : `Test failed (HTTP ${res.status}).`, res.ok ? "ok" : "err");
   } catch {
@@ -318,6 +324,7 @@ async function handleLine(text: string): Promise<void> {
       rsn: settings.rsn,
       value: info?.price ?? null,
       itemId: info?.id ?? null,
+      pingUserId: settings.pingUserId || null,
       screenshot: shot,
     });
     if (res.ok) {

@@ -211,6 +211,13 @@
       .adv > summary::before { content: "▸ "; color: var(--muted); }
       .adv[open] > summary::before { content: "▾ "; }
 
+      .hint {
+        margin-top: 3px;
+        font-size: 10px;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+
       .last {
         margin-top: 6px;
         padding: 0 2px;
@@ -242,6 +249,12 @@
           <span class="inp inp--static">•••••••••••••••<b id="wh-tail"></b></span>
           <button id="wh-change" class="btn btn--ghost" type="button">Change</button>
         </div>
+
+        <label class="lbl" for="ping">Ping me (Discord user ID)</label>
+        <input id="ping" class="inp" type="text" inputmode="numeric" placeholder="optional — leave blank for no @mention"
+               autocomplete="off" spellcheck="false"
+               title="Discord → Settings → Advanced → turn on Developer Mode, then right-click your name → Copy User ID. It's a 17–20 digit number." />
+        <div class="hint">Discord &rsaquo; Settings &rsaquo; Advanced &rsaquo; Developer Mode &rsaquo; right-click your name &rsaquo; Copy User ID</div>
 
         <div class="divider"></div>
         <label class="lbl">Broadcast</label>
