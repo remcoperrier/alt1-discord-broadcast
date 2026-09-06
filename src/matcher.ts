@@ -1,5 +1,3 @@
-import { canonItem } from "./format";
-
 /** Discriminated union of everything the plugin can broadcast. `raw` is the
  *  normalised source line, used for de-duplication. */
 export type GameEvent = { raw: string } & (
@@ -53,6 +51,31 @@ function hasRsn(line: string, rsn: string): boolean {
   return !!rsn.trim() && line.toLowerCase().includes(rsn.trim().toLowerCase());
 }
 
+/** An item name that is really OCR noise (stray quotes/symbols, punctuation runs,
+ *  too long, too few letters). RS item names only use letters, digits, spaces and
+ *  ' ( ) - . , & */
+export function looksGarbledItem(s: string): boolean {
+  const t = s.trim();
+  if (t.length < 2 || t.length > 45) return true;
+  if (/[^A-Za-z0-9 '()\-.,&]/.test(t)) return true;
+  if (/[.,'\-]{3,}/.test(t)) return true;
+  if ((t.match(/[A-Za-z]/g) || []).length < 2) return true;
+  return false;
+}
+
+/** Letter-only fingerprint of an item name — collapses OCR wobble in
+ *  spaces / apostrophes / punctuation so "Devourer's Nexus", "Devourers Nexus"
+ *  and "Devourer s Nexus" all key the same. */
+export function itemFingerprint(s: string): string {
+  return s.toLowerCase().replace(/[^a-z]/g, "");
+}
+
+function drop(item: string, qty: number, pet: boolean, line: string): GameEvent | null {
+  const name = item.trim();
+  if (!name || looksGarbledItem(name)) return null;
+  return { kind: "drop", item: name, qty, pet, raw: line };
+}
+
 // --- individual matchers -------------------------------------------------
 
 function matchDrop(line: string, rsn: string): GameEvent | null {
@@ -66,13 +89,10 @@ function matchDrop(line: string, rsn: string): GameEvent | null {
   const pet =
     rest.match(/^(.+?),\s*the\s+[\w'-]+\s+pet\b/i) ||
     rest.match(/^(?:a|the)\s+(.+?)\s+pet\b/i);
-  if (pet) return { kind: "drop", item: pet[1].trim(), qty: 1, pet: true, raw: line };
+  if (pet) return drop(pet[1], 1, true, line);
 
   const colon = rest.match(/(?:drop|item|reward)s?\s*:\s*(.+)$/i);
-  if (colon) {
-    const item = stripArticle(colon[1].trim().replace(/[.!]+$/, ""));
-    return item ? { kind: "drop", item, qty: 1, pet: false, raw: line } : null;
-  }
+  if (colon) return drop(stripArticle(colon[1].replace(/[.!]+$/, "")), 1, false, line);
 
   rest = rest.replace(/\s+drop$/i, "").trim();
   let qty = 1;
@@ -81,8 +101,7 @@ function matchDrop(line: string, rsn: string): GameEvent | null {
     qty = parseInt(q[1].replace(/,/g, ""), 10) || 1;
     rest = q[2].trim();
   }
-  const item = stripArticle(rest);
-  return item ? { kind: "drop", item, qty, pet: false, raw: line } : null;
+  return drop(stripArticle(rest), qty, false, line);
 }
 
 function matchLevelUp(line: string): GameEvent | null {
@@ -165,7 +184,9 @@ function matchClue(line: string, rsn: string): GameEvent | null {
   if (!hasRsn(line, rsn)) return null;
   const m = line.match(/completed a treasure trail and received (.+?)[.!]?$/i);
   if (!m) return null;
-  return { kind: "clue", item: stripArticle(m[1].trim()), raw: line };
+  const item = stripArticle(m[1].trim());
+  if (!item || looksGarbledItem(item)) return null;
+  return { kind: "clue", item, raw: line };
 }
 
 // --- entry point -------------------------------------------------------
@@ -203,7 +224,7 @@ export function dedupKeys(ev: GameEvent, rsn: string): string[] {
   let sem: string;
   switch (ev.kind) {
     case "drop":
-      sem = `${ev.pet ? "pet" : "drop"}|${canonItem(ev.item)}`;
+      sem = `${ev.pet ? "pet" : "drop"}|${itemFingerprint(ev.item)}`;
       break;
     case "levelup":
       sem = `levelup|${ev.skill}|${ev.virtual ? "v" : ""}${ev.level}`;
@@ -225,7 +246,7 @@ export function dedupKeys(ev: GameEvent, rsn: string): string[] {
       sem = `areatask|${ev.area.toLowerCase()}|${ev.tier ?? ""}`;
       break;
     case "clue":
-      sem = `clue|${canonItem(ev.item)}`;
+      sem = `clue|${itemFingerprint(ev.item)}`;
       break;
   }
   return ["line:" + ev.raw.toLowerCase(), "evt:" + r + "|" + sem];

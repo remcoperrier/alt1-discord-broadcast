@@ -41,7 +41,7 @@ const DEFAULTS: Settings = {
     clues: true,
   },
   levelUpMin: 99,
-  dedupWindowMs: 90_000,
+  dedupWindowMs: 150_000,
 };
 
 export function loadSettings(): Settings {
@@ -53,6 +53,8 @@ export function loadSettings(): Settings {
         ...DEFAULTS,
         ...parsed,
         categories: { ...DEFAULTS.categories, ...(parsed.categories ?? {}) },
+        // enforce a floor so older stored values still get the wider window
+        dedupWindowMs: Math.max(150_000, parsed.dedupWindowMs ?? 0),
       };
     }
   } catch {

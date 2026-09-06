@@ -91,6 +91,16 @@ function looksStalled(t: string): boolean {
   return words < 4 || /[\]:)»›·⤷↝∞]\s*$/.test(t);
 }
 
+/** A full chat line that came back as OCR noise — stray symbols never seen in
+ *  RS chat, long character runs, or mostly non-letters. */
+function lineLooksGarbled(t: string): boolean {
+  if (/["|\\*=<>`~]/.test(t)) return true;
+  if (/(.)\1{4,}/.test(t)) return true;
+  const letters = (t.match(/[A-Za-z]/g) || []).length;
+  const nonspace = t.replace(/\s/g, "").length;
+  return nonspace > 6 && letters / nonspace < 0.5;
+}
+
 // --- RSN auto-detection ----------------------------------------------------
 
 /** Read the player's name from the chat input line
@@ -425,8 +435,14 @@ function tick(): void {
       const buf = getBoxBuf();
       if (buf) {
         const rescued = rescueRow(buf, line.basey);
-        if (rescued.split(/\s+/).length > text.split(/\s+/).length) {
-          if (rescued) dlog(`rescued: ${rescued}`);
+        // Only take the rescue if it read *more* and isn't OCR vomit — a
+        // garbled rescue varies between polls and slips past de-dup.
+        if (
+          rescued &&
+          !lineLooksGarbled(rescued) &&
+          rescued.split(/\s+/).length > text.split(/\s+/).length
+        ) {
+          dlog(`rescued: ${rescued}`);
           text = rescued;
         }
       }

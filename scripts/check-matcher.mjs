@@ -15,6 +15,10 @@ const cases = [
   ["[22:56:45] Leagues: ⤷taleyy has received an Orb of corrupted anima drop!", "taleyy",
     { kind: "drop", item: "Orb of corrupted anima" }],
   ["[21:00:00] Someone Else has received a Memory Dowser drop!", "taleyy", null],
+  ["14:49 Fysmat has received a Devourer's Nexus drop!", "Fysmat",
+    { kind: "drop", item: "Devourer's Nexus" }],
+  // garbled OCR of the same line must NOT produce an event
+  ['14:50 Fysmat has received a " .e Devourer\'s"!-"us" !\'op!"""""""""" drop!', "Fysmat", null],
 
   // level-ups (personal)
   ["[23:15:23] You've just advanced a virtual Defence level! You have reached level 104.", "taleyy",
@@ -80,6 +84,18 @@ for (const [line, rsn, expect] of cases) {
   console.log(`      want: ${JSON.stringify(expect)}`);
   console.log(`      got : ${JSON.stringify(got)}`);
   if (got) console.log(`      keys: ${JSON.stringify(dedupKeys(got, rsn))}`);
+}
+
+// de-dup: OCR wobble on the same item must produce the same semantic key
+{
+  const variants = ["Devourer's Nexus", "Devourers Nexus", "Devourer s Nexus", "devourers   nexus"];
+  const keys = variants.map(
+    (v) => dedupKeys({ kind: "drop", item: v, qty: 1, pet: false, raw: v }, "Fysmat")[1],
+  );
+  const allSame = keys.every((k) => k === keys[0]);
+  if (!allSame) failures++;
+  console.log(`${allSame ? "PASS" : "FAIL"}  dedup fingerprint stable across OCR wobble`);
+  console.log(`      keys: ${JSON.stringify(keys)}`);
 }
 console.log(`\n${cases.length - failures}/${cases.length} passed`);
 process.exit(failures ? 1 : 0);
