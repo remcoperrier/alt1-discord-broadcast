@@ -19,12 +19,22 @@ const staticFiles = {
   setup(build) {
     build.onEnd(async () => {
       const v = Date.now().toString(36);
+
+      // Cache-bust the bundle reference so a fetched index.html always pulls
+      // the fresh build.
       const html = (await readFile("src/index.html", "utf8")).replace(
         './bundle.js"',
         `./bundle.js?v=${v}"`,
       );
       await writeFile(`${OUT}/index.html`, html);
-      await cp("src/appconfig.json", `${OUT}/appconfig.json`);
+
+      // Stamp a changing `version` into appconfig.json — Alt1 polls configUrl
+      // and re-downloads the app when the config content differs, so every
+      // deploy triggers its auto-update instead of serving a stale cache.
+      const cfg = JSON.parse(await readFile("src/appconfig.json", "utf8"));
+      cfg.version = v;
+      await writeFile(`${OUT}/appconfig.json`, JSON.stringify(cfg, null, 2) + "\n");
+
       await writeFile(`${OUT}/.nojekyll`, ""); // GitHub Pages: serve files as-is
       if (await exists("src/icon.png")) await cp("src/icon.png", `${OUT}/icon.png`);
     });
