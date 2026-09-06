@@ -234,7 +234,7 @@ el<HTMLButtonElement>("save").addEventListener("click", () => {
   const webhook = whInputRow.classList.contains("hidden")
     ? settings.webhook
     : webhookEl.value.trim();
-  const pingUserId = pingEl.value.replace(/\D/g, "");
+  const pingUserId = pingEl.value.trim();
   settings = {
     ...settings,
     rsn: rsnEl.value.trim(),
@@ -246,14 +246,22 @@ el<HTMLButtonElement>("save").addEventListener("click", () => {
       CATEGORIES.map((c) => [c, catEls[c].checked]),
     ) as Settings["categories"],
   };
-  pingEl.value = pingUserId;
+  pingEl.value = pingUserId; // keep exactly what was entered
   lvlMinEl.value = String(lvlMin);
   saveSettings(settings);
   dedup.setWindow(settings.dedupWindowMs);
   editingWebhook = false;
   webhookEl.value = "";
   renderWebhook();
-  setStatus("Settings saved.", "ok");
+
+  if (pingUserId && !/^\d{17,20}$/.test(pingUserId)) {
+    setStatus(
+      "Saved. The ping ID must be a 17–20 digit number — in Discord turn on Developer Mode, then right-click your name → Copy User ID.",
+      "warn",
+    );
+  } else {
+    setStatus("Settings saved.", "ok");
+  }
 });
 
 el<HTMLButtonElement>("preview").addEventListener("click", async () => {

@@ -217,6 +217,7 @@
         line-height: 1.35;
         color: var(--muted);
       }
+      .hint b { color: var(--text); font-weight: 700; }
 
       .last {
         margin-top: 6px;
@@ -251,10 +252,10 @@
         </div>
 
         <label class="lbl" for="ping">Ping me (Discord user ID)</label>
-        <input id="ping" class="inp" type="text" inputmode="numeric" placeholder="optional — leave blank for no @mention"
+        <input id="ping" class="inp" type="text" inputmode="numeric" placeholder="17–20 digit ID — not your username"
                autocomplete="off" spellcheck="false"
-               title="Discord → Settings → Advanced → turn on Developer Mode, then right-click your name → Copy User ID. It's a 17–20 digit number." />
-        <div class="hint">Discord &rsaquo; Settings &rsaquo; Advanced &rsaquo; Developer Mode &rsaquo; right-click your name &rsaquo; Copy User ID</div>
+               title="Discord → Settings → Advanced → turn on Developer Mode, then right-click your name → Copy User ID. It's a 17–20 digit number, not your @username." />
+        <div class="hint">Discord &rsaquo; Settings &rsaquo; Advanced &rsaquo; Developer Mode &rsaquo; right-click your name &rsaquo; <b>Copy User ID</b> (a number, not your username)</div>
 
         <div class="divider"></div>
         <label class="lbl">Broadcast</label>
