@@ -56,9 +56,16 @@ const cases = [
   ["[21:00:00] *News: taleyy completed a Treasure Trail and received Third age longsword!", "taleyy",
     { kind: "clue", item: "Third age longsword" }],
 
-  // area task (heuristic)
-  ["[21:00:00] You have completed all of the Easy Desert achievements!", "taleyy",
+  // area / combat achievement broadcast (global "News:", needs an RSN match
+  // like every other broadcast matcher — this was the Grandmaster Combat
+  // Mastery false-attribution bug: any player's completion was posted under
+  // the local account's name)
+  ["[21:00:00] Fysmat has completed all of the Easy Desert achievements!", "Fysmat",
     { kind: "areatask", area: "Desert", tier: "easy" }],
+  ["[18:11:51] *News: Fysmat has completed all Grandmaster Combat Mastery achievements!", "Fysmat",
+    { kind: "areatask", area: "Combat Mastery", tier: "grandmaster" }],
+  ["[18:11:51] *News: Lina has completed all Grandmaster Combat Mastery achievements!", "Fysmat", null],
+  ["[18:11:51] *News: Lina has completed all Easy Combat Mastery achievements!", "Fysmat", null],
 
   // must NOT match — routine "completed" chatter
   ["[21:05:48] You have completed 882 assignments.", "taleyy", null],

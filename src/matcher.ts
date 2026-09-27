@@ -163,11 +163,15 @@ function matchTitle(line: string, rsn: string): GameEvent | null {
   return { kind: "title", title: m[2].trim(), flavour: m[1] ? m[1].trim() : null, raw: line };
 }
 
-function matchAreaTask(line: string): GameEvent | null {
-  // "... completed all[ of the] [Easy] Desert achievements ..."
+function matchAreaTask(line: string, rsn: string): GameEvent | null {
+  // "<name> has completed all[ of the] [Grandmaster] Combat Mastery achievements!"
+  // This is a global "News:" broadcast for *anyone's* completion, same as
+  // skill99/title/clue, so it needs the same RSN gate — without it, every
+  // player's achievement broadcast gets attributed to the local account.
+  if (!hasRsn(line, rsn)) return null;
   // Requires the literal word "achievements" — "tasks"/"assignments" are noisy.
   const m = line.match(
-    /completed all(?: of)?(?: the)? (easy|medium|hard|elite|master)?\s*([A-Za-z' ]{2,40}?) achievements\b/i,
+    /completed all(?: of)?(?: the)? (easy|medium|hard|elite|master|grandmaster)?\s*([A-Za-z' ]{2,40}?) achievements\b/i,
   );
   if (!m) return null;
   const area = m[2].trim();
@@ -204,7 +208,7 @@ export function parseLine(rawText: string, rsn: string): GameEvent | null {
     matchSkillMilestone(line, rsn) ||
     matchTitle(line, rsn) ||
     matchClue(line, rsn) ||
-    matchAreaTask(line) ||
+    matchAreaTask(line, rsn) ||
     matchFeat(line, rsn) ||
     null
   );
